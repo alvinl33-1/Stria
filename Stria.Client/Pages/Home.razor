@@ -1,0 +1,101 @@
+@page "/"
+@using System.Net.Http.Json
+@using Stria.Client.Components
+@inject HttpClient Http
+
+<PageTitle>Stria | Resilience Console</PageTitle>
+
+<main class="stria-console">
+    <header class="console-header">
+        <a class="wordmark" href="/" aria-label="Stria home"><span class="wordmark-mark">S</span> STRIA</a>
+        <span class="header-caption">RESILIENCE / CONTROL</span>
+        <span class="environment-tag"><span class="environment-dot"></span> LOCAL ENVIRONMENT</span>
+    </header>
+
+    <section class="page-intro">
+        <div class="eyebrow">FAULT INJECTION</div>
+        <h1>Service control</h1>
+        <p>Introduce a controlled fault to test how dependent systems respond. Changes take effect immediately.</p>
+    </section>
+
+    <section class="service-grid" aria-label="Service fault controls">
+        <article class="service-panel">
+            <div class="service-index">01 <span>PAYMENTS</span></div>
+            <h2>Payment Gateway</h2>
+            <p>Add a three second delay to payment requests.</p>
+            <div class="service-actions">
+                <button class="action-button action-warn" disabled="@_isSubmitting" @onclick='() => CommitChaos("PaymentGateway", "Latency")'>Inject latency <span>↗</span></button>
+                <button class="clear-button" disabled="@_isSubmitting" @onclick='() => CommitChaos("PaymentGateway", "None")'>Clear fault</button>
+            </div>
+        </article>
+        <article class="service-panel">
+            <div class="service-index">02 <span>IDENTITY</span></div>
+            <h2>Auth Service</h2>
+            <p>Return simulated HTTP 503 responses.</p>
+            <div class="service-actions">
+                <button class="action-button action-danger" disabled="@_isSubmitting" @onclick='() => CommitChaos("AuthService", "HttpFailure")'>Inject HTTP 503 <span>↗</span></button>
+                <button class="clear-button" disabled="@_isSubmitting" @onclick='() => CommitChaos("AuthService", "None")'>Clear fault</button>
+            </div>
+        </article>
+        <article class="service-panel">
+            <div class="service-index">03 <span>INVENTORY</span></div>
+            <h2>Inventory API</h2>
+            <p>Simulate elevated CPU load on inventory.</p>
+            <div class="service-actions">
+                <button class="action-button action-cool" disabled="@_isSubmitting" @onclick='() => CommitChaos("InventoryAPI", "CpuSpike")'>Induce CPU spike <span>↗</span></button>
+                <button class="clear-button" disabled="@_isSubmitting" @onclick='() => CommitChaos("InventoryAPI", "None")'>Clear fault</button>
+            </div>
+        </article>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(_consoleLogMessage))
+    {
+        <div class="action-feedback" role="status">@_consoleLogMessage</div>
+    }
+
+    <section class="monitor-section">
+        <div class="section-heading">
+            <div><div class="eyebrow">LIVE TELEMETRY</div><h2>Service health</h2></div>
+            <span class="poll-note">Updates every 3 seconds</span>
+        </div>
+        <ActiveFaultsTable />
+    </section>
+</main>
+
+@code {
+    private string? _consoleLogMessage;
+    private bool _isSubmitting;
+    private sealed record FaultInjectionRequest(string TargetService, string FaultType, int? LatencyMs = null, string TriggeredBy = "ManualDashboard");
+
+    private async Task CommitChaos(string targetService, string faultType)
+    {
+        if (_isSubmitting)
+            return;
+
+        _isSubmitting = true;
+        _consoleLogMessage = $"Sending {faultType} command to {targetService}…";
+        try
+        {
+            int? latencyMs = string.Equals(faultType, "Latency", StringComparison.OrdinalIgnoreCase) ? 3000 : null;
+            var payload = new FaultInjectionRequest(targetService, faultType, latencyMs);
+            using var response = await Http.PostAsJsonAsync("/api/chaos/inject", payload);
+            if (response.IsSuccessStatusCode)
+            {
+                var outcome = faultType == "None" ? "fault cleared" : $"{faultType} enabled";
+                _consoleLogMessage = $"{targetService}: {outcome}.";
+            }
+            else
+            {
+                _consoleLogMessage = $"Command failed ({(int)response.StatusCode} {response.StatusCode}).";
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _consoleLogMessage = "Could not reach the Stria API. Check that the host is running.";
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+}

@@ -1,0 +1,157 @@
+@using System.Net.Http.Json
+@implements IAsyncDisposable
+@inject HttpClient Http
+
+<section aria-live="polite">
+    <h3 class="fault-list-title">Current incidents</h3>
+    <div class="row g-3 mb-4">
+        @foreach (var service in TargetServices)
+        {
+            var fault = _faults?.FirstOrDefault(item => string.Equals(item.TargetService, service, StringComparison.OrdinalIgnoreCase));
+            var hasFault = fault is not null;
+            var barClass = _faults is null ? "bg-secondary" : hasFault ? "bg-danger fault-pulse" : "bg-success";
+            var label = _faults is null ? "Status unavailable" : hasFault ? $"FAULT: {fault!.FaultType}" : "Healthy";
+            <div class="col-md-4" @key="service">
+                <div class="service-status-label">@service <span>@label</span></div>
+                <div class="progress" role="progressbar" aria-label="@($"{service} status")" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@(_faults is null ? 0 : 100)">
+                    <div class="progress-bar @barClass" style="width: @(_faults is null ? 0 : 100)%"></div>
+                </div>
+            </div>
+        }
+    </div>
+    @if (_faults is null)
+    {
+        <p class="fault-empty">@_message</p>
+    }
+    else if (_faults.Count == 0)
+    {
+        <p class="fault-empty">No active faults.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table fault-table align-middle">
+                <thead>
+                    <tr>
+                        <th scope="col">Target service</th>
+                        <th scope="col">Fault type</th>
+                        <th scope="col">Latency</th>
+                        <th scope="col">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var fault in _faults)
+                    {
+                        <tr @key="fault.TargetService">
+                            <td>@fault.TargetService</td>
+                            <td>@fault.FaultType</td>
+                            <td>@(fault.LatencyMs is int latency ? $"{latency} ms" : "—")</td>
+                            <td>
+                                <button class="fault-clear-button"
+                                        disabled="@_clearing.Contains(fault.TargetService)"
+                                        @onclick="() => ClearFault(fault.TargetService)">
+                                    @(_clearing.Contains(fault.TargetService) ? "Clearing…" : "Clear")
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    private readonly CancellationTokenSource _pollCancellation = new();
+    private readonly HashSet<string> _clearing = new(StringComparer.OrdinalIgnoreCase);
+    private List<ChaosFault>? _faults;
+    private string _message = "Loading active faults...";
+    private Task? _pollTask;
+
+    private sealed record ChaosFault(string TargetService, string FaultType, int? LatencyMs);
+    private sealed record FaultInjectionRequest(string TargetService, string FaultType, int? LatencyMs = null, string TriggeredBy = "ManualDashboard");
+    private static readonly string[] TargetServices = ["PaymentGateway", "AuthService", "InventoryAPI"];
+
+    protected override void OnInitialized()
+    {
+        _pollTask = PollFaults();
+    }
+
+    private async Task PollFaults()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
+        try
+        {
+            do
+            {
+                await RefreshFaults();
+                if (!await timer.WaitForNextTickAsync(_pollCancellation.Token))
+                    break;
+            } while (!_pollCancellation.IsCancellationRequested);
+        }
+        catch (OperationCanceledException) when (_pollCancellation.IsCancellationRequested)
+        {
+            // Component disposal cancels the timer wait.
+        }
+    }
+
+    private async Task RefreshFaults()
+    {
+        try
+        {
+            _faults = await Http.GetFromJsonAsync<List<ChaosFault>>("/api/chaos/faults", _pollCancellation.Token) ?? [];
+            _message = string.Empty;
+        }
+        catch (OperationCanceledException) when (_pollCancellation.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            _faults = null;
+            _message = $"Could not load active faults: {ex.Message}";
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ClearFault(string targetService)
+    {
+        if (!_clearing.Add(targetService))
+            return;
+
+        try
+        {
+            var request = new FaultInjectionRequest(targetService, "None");
+            using var response = await Http.PostAsJsonAsync("/api/chaos/inject", request, _pollCancellation.Token);
+            if (response.IsSuccessStatusCode)
+                await RefreshFaults();
+            else
+            {
+                _message = $"Could not clear {targetService}: server returned {response.StatusCode}.";
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException) when (_pollCancellation.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            _message = $"Could not clear {targetService}: {ex.Message}";
+            await InvokeAsync(StateHasChanged);
+        }
+        finally
+        {
+            _clearing.Remove(targetService);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _pollCancellation.CancelAsync();
+        if (_pollTask is not null)
+            await _pollTask;
+        _pollCancellation.Dispose();
+    }
+}
