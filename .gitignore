@@ -1,9 +1,30 @@
-### Example user template template
-### Example user template
-
-# IntelliJ project files
-.idea
-*.iml
-out
-gen
+# Local environment and secrets
 .env
+.env.*
+!.env.example
+!.env.*.example
+
+# .NET build output
+**/bin/
+**/obj/
+artifacts/
+
+# IDE and editor files
+.idea/
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.iml
+
+# Local databases and logs
+*.db
+*.db-shm
+*.db-wal
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
