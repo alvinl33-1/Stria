@@ -1,7 +1,11 @@
 {
-    "mcpServers": {
-        "JetBrains IDE": {
-            "url": "http://127.0.0.1:64342/sse"
-        }
+  "mcpServers": {
+    "JetBrains IDE": {
+      "url": "http://127.0.0.1:64342/sse"
+    },
+    "rider": {
+      "url": "http://127.0.0.1:64482/stream",
+      "type": "http"
     }
+  }
 }

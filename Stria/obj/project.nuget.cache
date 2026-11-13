@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "TVIdAl71X6M=",
+  "dgSpecHash": "UVnua0tMx8I=",
   "success": true,
   "projectFilePath": "/Users/alvinl33/Desktop/Projects/Stria/Stria/Stria.csproj",
   "expectedPackageFiles": [
@@ -33,7 +33,10 @@
     "/Users/alvinl33/.nuget/packages/system.composition.convention/9.0.0/system.composition.convention.9.0.0.nupkg.sha512",
     "/Users/alvinl33/.nuget/packages/system.composition.hosting/9.0.0/system.composition.hosting.9.0.0.nupkg.sha512",
     "/Users/alvinl33/.nuget/packages/system.composition.runtime/9.0.0/system.composition.runtime.9.0.0.nupkg.sha512",
-    "/Users/alvinl33/.nuget/packages/system.composition.typedparts/9.0.0/system.composition.typedparts.9.0.0.nupkg.sha512"
+    "/Users/alvinl33/.nuget/packages/system.composition.typedparts/9.0.0/system.composition.typedparts.9.0.0.nupkg.sha512",
+    "/Users/alvinl33/.nuget/packages/microsoft.netcore.app.ref/10.0.14/microsoft.netcore.app.ref.10.0.14.nupkg.sha512",
+    "/Users/alvinl33/.nuget/packages/microsoft.aspnetcore.app.ref/10.0.14/microsoft.aspnetcore.app.ref.10.0.14.nupkg.sha512",
+    "/Users/alvinl33/.nuget/packages/microsoft.netcore.app.host.osx-arm64/10.0.14/microsoft.netcore.app.host.osx-arm64.10.0.14.nupkg.sha512"
   ],
   "logs": []
 }

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "qfvRsgu6ek4=",
+  "dgSpecHash": "GNXxQMLg8PQ=",
   "success": true,
   "projectFilePath": "/Users/alvinl33/Desktop/Projects/Stria/Stria.Client/Stria.Client.csproj",
   "expectedPackageFiles": [
@@ -34,7 +34,9 @@
     "/Users/alvinl33/.nuget/packages/microsoft.jsinterop.webassembly/10.0.14/microsoft.jsinterop.webassembly.10.0.14.nupkg.sha512",
     "/Users/alvinl33/.nuget/packages/microsoft.net.illink.tasks/10.0.14/microsoft.net.illink.tasks.10.0.14.nupkg.sha512",
     "/Users/alvinl33/.nuget/packages/microsoft.net.sdk.webassembly.pack/10.0.14/microsoft.net.sdk.webassembly.pack.10.0.14.nupkg.sha512",
-    "/Users/alvinl33/.nuget/packages/microsoft.netcore.app.runtime.mono.browser-wasm/10.0.14/microsoft.netcore.app.runtime.mono.browser-wasm.10.0.14.nupkg.sha512"
+    "/Users/alvinl33/.nuget/packages/microsoft.netcore.app.ref/10.0.14/microsoft.netcore.app.ref.10.0.14.nupkg.sha512",
+    "/Users/alvinl33/.nuget/packages/microsoft.netcore.app.runtime.mono.browser-wasm/10.0.14/microsoft.netcore.app.runtime.mono.browser-wasm.10.0.14.nupkg.sha512",
+    "/Users/alvinl33/.nuget/packages/microsoft.aspnetcore.app.ref/10.0.14/microsoft.aspnetcore.app.ref.10.0.14.nupkg.sha512"
   ],
   "logs": []
 }

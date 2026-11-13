@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Stria.SampleService")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+dcba02bfd060ca3d34224f5d646f2b284bf447f0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+aaa2932a572553f22ebfa85c042eeb3bf68dc7bf")]
 [assembly: System.Reflection.AssemblyProductAttribute("Stria.SampleService")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Stria.SampleService")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
