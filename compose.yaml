@@ -5,7 +5,9 @@
       context: .
       dockerfile: Stria/Dockerfile
     ports:
-      - "127.0.0.1:8443:8443"
+      # Stria listens on plain HTTP port 8080 in its container. Bind it to loopback
+      # so the local dashboard and API are reachable without exposing them to the LAN.
+      - "127.0.0.1:8080:8080"
     environment:
       ConnectionStrings__Stria: "Host=db;Port=5432;Database=stria;Username=stria;Password=${STRIA_DB_PASSWORD:?set STRIA_DB_PASSWORD}"
       Database__MigrateOnStartup: "true"   # local/Compose convenience; leave off elsewhere

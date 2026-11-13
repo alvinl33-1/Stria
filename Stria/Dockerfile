@@ -1,7 +1,7 @@
 # Build from the repository root so the host can reference Stria.Client.
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
-EXPOSE 8080 8443
+EXPOSE 8080
 ENV ASPNETCORE_HTTP_PORTS=8080
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS publish

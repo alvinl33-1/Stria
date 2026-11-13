@@ -5,7 +5,7 @@ var e=!1;const t=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,
   "mainAssemblyName": "Stria.Client",
   "applicationEnvironment": "Development",
   "resources": {
-    "hash": "sha256-i3OlIDyXywsYTxwKwsEo1LF1W/nXTvjtDaI8PXYli/c=",
+    "hash": "sha256-Sb7KOlcGs9kH8DIU+JqNskShBLXiaKhXfBhzaI6cYF8=",
     "jsModuleNative": [
       {
         "name": "dotnet.native.bjoj0wmylw.js"
@@ -1236,33 +1236,33 @@ var e=!1;const t=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,
       },
       {
         "virtualPath": "Microsoft.DotNet.HotReload.WebAssembly.Browser.wasm",
-        "name": "Microsoft.DotNet.HotReload.WebAssembly.Browser.oqr95q2tlo.wasm",
-        "hash": "sha256-UN5DGLuISxz6d24KArZsSn1CgwVJNfcmeoFmHiz5EgI=",
+        "name": "Microsoft.DotNet.HotReload.WebAssembly.Browser.yu29y3szip.wasm",
+        "hash": "sha256-RruTimwKw4K2TpuDDXv8DI2MX373DEGhXmNyMkiIX2s=",
         "cache": "force-cache"
       },
       {
         "virtualPath": "Stria.Client.wasm",
-        "name": "Stria.Client.xnr42vm2s0.wasm",
-        "hash": "sha256-DWO0IuFM4Jd4ZtwyBZ7fmCUK6Bb2AjJZ6NKZIs7lp3s=",
+        "name": "Stria.Client.mfakmwfkoc.wasm",
+        "hash": "sha256-0re9nmzIy/929YnPZ09yh4dUmBM8yY0FYF2mEnTa6go=",
         "cache": "force-cache"
       }
     ],
     "pdb": [
       {
         "virtualPath": "Stria.Client.pdb",
-        "name": "Stria.Client.dmm0j0dsec.pdb",
-        "hash": "sha256-hTWIxE4ZO4B+cFGY/2CKJSDC2Qlh1qoUhj/NwSeAVtQ=",
+        "name": "Stria.Client.hyuhb6lnw9.pdb",
+        "hash": "sha256-+YnOZALk6VcR16P7kZdYT9joxJKqzyEu/cTIYJR/NJM=",
         "cache": "force-cache"
       }
     ],
     "libraryInitializers": [
       {
-        "name": "_framework/Microsoft.DotNet.HotReload.WebAssembly.Browser.hdl7ay4ywj.lib.module.js"
+        "name": "_framework/Microsoft.NET.Sdk.WebAssembly.DotNetWatch.cy07cqg8cu.lib.module.js"
       }
     ],
     "modulesAfterConfigLoaded": [
       {
-        "name": "../_framework/Microsoft.DotNet.HotReload.WebAssembly.Browser.hdl7ay4ywj.lib.module.js"
+        "name": "../_framework/Microsoft.NET.Sdk.WebAssembly.DotNetWatch.cy07cqg8cu.lib.module.js"
       }
     ]
   },
@@ -1285,13 +1285,13 @@ var e=!1;const t=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,
         "System.ComponentModel.TypeConverter.EnableUnsafeBinaryFormatterInDesigntimeLicenseContextSerialization": false,
         "System.ComponentModel.TypeDescriptor.IsComObjectDescriptorSupported": false,
         "System.Data.DataSet.XmlSerializationIsSupported": false,
-        "System.Diagnostics.Metrics.Meter.IsSupported": false,
-        "System.Diagnostics.Tracing.EventSource.IsSupported": false,
+        "System.Diagnostics.Metrics.Meter.IsSupported": true,
+        "System.Diagnostics.Tracing.EventSource.IsSupported": true,
         "System.GC.Server": true,
         "System.Globalization.Invariant": false,
         "System.TimeZoneInfo.Invariant": false,
         "System.Linq.Enumerable.IsSizeOptimized": true,
-        "System.Net.Http.EnableActivityPropagation": false,
+        "System.Net.Http.EnableActivityPropagation": true,
         "System.Net.Http.WasmEnableStreamingResponse": true,
         "System.Net.SocketsHttpHandler.Http3Support": false,
         "System.Reflection.Metadata.MetadataUpdater.IsSupported": false,

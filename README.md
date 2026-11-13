@@ -31,10 +31,9 @@ docker compose up --build
 
 Compose starts PostgreSQL, waits for its health check, starts Stria, and starts the sample service. In this configuration, Stria applies database migrations on startup. The sample service is available at:
 
+- `http://localhost:8080` — Stria dashboard and HTTP API.
 - `http://localhost:8081/work` — sample service work endpoint.
 - `http://localhost:8081/healthz` — sample service health endpoint.
-
-> **Current Compose limitation:** `compose.yaml` publishes container port `8443`, but the Stria container is configured to listen only on HTTP port `8080`. The Stria dashboard and API are therefore not reachable from the host with the repository's current Compose configuration. Align the port mapping with the listener, or configure an HTTPS listener and certificate, before documenting a host URL for Stria.
 
 Stop the stack with `Ctrl+C`; use `docker compose down` to stop and remove the containers. The named `stria-pgdata` volume retains database contents when containers are removed.
 

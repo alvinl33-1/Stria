@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Stria.Client")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+aaa2932a572553f22ebfa85c042eeb3bf68dc7bf")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b85f3ef5d8d6c739666c8b38e5c5c5b10e79a7f7")]
 [assembly: System.Reflection.AssemblyProductAttribute("Stria.Client")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Stria.Client")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

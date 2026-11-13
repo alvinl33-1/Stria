@@ -4,6 +4,7 @@
 !.env.example
 !.env.*.example
 
+
 # .NET build output
 **/bin/
 **/obj/
