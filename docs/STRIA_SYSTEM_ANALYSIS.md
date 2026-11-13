@@ -1,77 +1,145 @@
 # Stria System Analysis and Enhancement Handoff
 
-This document summarizes the repository as inspected on 2026-11-09. It is intended as context for Claude before the first system enhancement iteration.
+This document describes the repository as inspected on 2026-11-13. It is a current-state handoff for future development work. The source code and `README.md` are authoritative if this document later becomes stale.
 
 ## Project purpose
 
-Stria is a small chaos-control dashboard. Operators can enable a fault for one of three named services, view active fault state, and clear a fault. The current implementation is a prototype: it stores state in process memory and reports simulated traffic activity, but it does not yet apply faults to real dependencies or generate traffic.
+Stria is a .NET 10 chaos-engineering control-plane demo. An operator uses a Blazor dashboard or HTTP API to create bounded fault experiments for registered services. Stria persists those experiments in PostgreSQL and provides a polling directive endpoint that participating services use to apply faults locally.
 
-## Architecture map
+The repository includes one participating data-plane service, `sample-payment-gateway`. It polls Stria and can actually apply latency and HTTP-failure faults to its `/work` endpoint. The remaining registered targets are currently control-plane entries only.
+
+## Current architecture
 
 ```text
 Browser
-  └── Stria.Client (Blazor WebAssembly UI)
-        ├── POST /api/chaos/inject
-        └── GET  /api/chaos/faults (polls every 3 seconds)
-              └── Stria host (ASP.NET Core, Stria/Program.cs)
-                    ├── IChaosOrchestrator
-                    │     └── DatabaseChaosOrchestrator (currently in-memory)
-                    └── TrafficSimulatorService (hosted background service)
+  └── Stria dashboard (Blazor WebAssembly + interactive server components)
+        └── Stria host (ASP.NET Core)
+              ├── POST /api/chaos/inject
+              ├── GET  /api/chaos/faults
+              ├── GET  /api/chaos/directives/{service}
+              ├── DatabaseChaosOrchestrator
+              │     └── PostgreSQL / ChaosExperiments
+              ├── ExperimentExpiryService
+              └── ExperimentRetentionService
+
+sample-payment-gateway
+  └── polls Stria directives every second
+        └── applies fault middleware to /work
 ```
 
-The host project references `Stria.Client` and serves its static WebAssembly assets. `compose.yaml` currently runs only the host container. Its intended local HTTPS address is `https://localhost:8443`; HTTP port 8080 is internal to the container. Compose requires `STRIA_HTTPS_CERT_PATH` and `STRIA_HTTPS_CERT_PASSWORD` from the environment. It also mounts a named volume for the ASP.NET Core Data Protection key ring.
+## Runtime topology
 
-## Layer responsibilities and files
+`compose.yaml` starts three services:
 
-| Layer | Files | Current responsibility |
+| Service | Responsibility | Reachability |
 |---|---|---|
-| Host/bootstrap/API | `Stria/Program.cs` | Registers Razor component hosting and services, configures Data Protection, maps `GET /api/chaos/faults` and `POST /api/chaos/inject`, validates service/fault keys and latency bounds. |
-| Domain | `Stria/Domain/ChaosExperiment.cs` | Experiment state: target, fault type, status, timestamps, trigger metadata. |
-| Request contract | `Stria/DTOs/FaultInjectionRequest.cs` | Injection request shape: target, fault type, optional latency, trigger label. |
-| Orchestration boundary | `Stria/Services/IChaosOrchestrator.cs` | Contract to inject a fault and query active state. |
-| Orchestration implementation | `Stria/Services/DatabaseChaosOrchestrator.cs` | Despite its name, stores only the latest experiment per service in a `ConcurrentDictionary`; no database is used. |
-| Background worker | `Stria/TrafficSimulatorService.cs` | Checks configured service keys every 2.5 seconds and logs active faults or routine-traffic messages. It does not currently create traffic or enact a fault. |
-| Client entry page | `Stria.Client/Pages/Home.razor` | Fault injection controls and operator feedback. |
-| Client telemetry | `Stria.Client/Components/ActiveFaultsTable.razor` | Polls active faults every three seconds, shows service status bars/table, and posts clear requests. |
-| UI styles/layout | `Stria.Client/Pages/Home.razor.css`, `Stria.Client/Components/ActiveFaultsTable.razor.css`, `Stria.Client/Layout/MainLayout.razor*` | Custom console styling and the app shell. |
-| Container/runtime | `compose.yaml`, `Stria/Dockerfile`, `Stria.Client/Dockerfile` | Compose uses the host Dockerfile; the separate Nginx client image is not part of current Compose deployment. |
+| `stria-server` | Dashboard, control API, directive API, background workers | `http://localhost:8080`, bound to loopback |
+| `db` | PostgreSQL 16 experiment storage | Internal Compose network only |
+| `sample-payment-gateway` | Demo data-plane participant | `http://localhost:8081`, bound to loopback |
 
-## API contract
+The host runs plain HTTP on container port `8080`; Compose publishes that same port to `127.0.0.1:8080`. This replaces the old, incorrect `8443:8443` mapping. `sample-payment-gateway` reaches Stria over the private Compose network at `http://stria-server:8080`.
 
-- `GET /api/chaos/faults`: returns the current active experiments.
-- `POST /api/chaos/inject`: accepts `{ targetService, faultType, latencyMs?, triggeredBy? }`; returns 202 when accepted.
-- Registered targets: `PaymentGateway`, `AuthService`, `InventoryAPI` (case-insensitive).
-- Supported faults: `Latency`, `HttpFailure`, `CpuSpike`, `None` (case-insensitive).
-- Latency is required for `Latency` and must be 1–60,000 ms; it is rejected for other fault types.
-- `FaultType = "None"` clears the target's current state.
+Compose applies EF Core migrations on startup for local convenience. This is suitable for the demo but should be replaced by a controlled migration step before a multi-replica production deployment.
 
-## Important known gaps and risks
+## Fault model
 
-1. **No authentication/authorization.** Both API endpoints are unauthenticated. Compose binds HTTPS to loopback, which limits exposure in the local Compose setup, but this is not suitable for deployment to a shared or public network.
-2. **Faults are state only.** `HttpFailure`, `CpuSpike`, and `Latency` currently only become labels in memory and logs. No service middleware, dependency proxy, traffic generator, or resource stressor applies them.
-3. **State is volatile and singular.** Restarting the host clears the in-memory registry. The implementation stores one current experiment per service rather than an experiment history. The class name `DatabaseChaosOrchestrator` and EF/Npgsql package references imply persistence that does not exist.
-4. **Server-side `HttpClient` is hard-coded.** `Stria/Program.cs` uses `http://localhost:8080`. This matches the container's private HTTP listener, but it will fail in local development on the configured launch ports unless server-interactive code routes to the appropriate origin. Prefer avoiding loopback HTTP calls from server-rendered code, or configure a reliable host-aware base address.
-5. **Polling and error handling.** The WASM component polls correctly for local operation, but errors include exception text in the UI. Consider logging details server-side and displaying a short operator-safe message. A shared refresh/event mechanism could avoid waiting up to three seconds after Home-page injections.
-6. **Operational logging.** Routine per-service messages every 2.5 seconds can generate noisy logs. Active faults are logged at `Critical`, which can incorrectly signal host failure to alerting systems; use a severity matching the operational event.
-7. **Compose HTTPS inputs are external prerequisites.** Compose validation fails until certificate path/password variables are set. The local dev certificate must be trusted by the browser. Never commit a PFX or its password.
-8. **Build status is unconfirmed.** Prior client builds found and fixed a nullable conditional and a Razor interpolation issue. A later build did not complete in the available session; run a clean solution build before the next release.
+Stria recognizes these target names, case-insensitively:
 
-## Suggested first enhancement iteration
+- `PaymentGateway`
+- `AuthService`
+- `InventoryAPI`
 
-Keep the first iteration narrow and observable:
+The API supports these fault types:
 
-1. Add API/service tests for target/fault validation, latency bounds, activation, clearing, and case-insensitive service keys.
-2. Rename the in-memory implementation to reflect its behavior, or implement actual persistence behind `IChaosOrchestrator`; do not present in-memory state as database-backed.
-3. Decide the fault execution boundary. Define how `Latency`, `HttpFailure`, and `CpuSpike` affect a controlled sample dependency, and keep unsafe host-wide stress out of the web process.
-4. Protect the control API with operator authentication/authorization before adding remote exposure.
-5. Align server-side UI/API calls with both local launch and HTTPS Compose addresses; avoid a hard-coded localhost base URL.
-6. Improve state feedback: expose last poll success/time, make injection results visible to the table immediately, and keep user-facing errors concise.
-7. Build and run the host + WASM app in both local HTTP development and the configured HTTPS Compose path.
+| Fault | Parameters | Current execution behavior |
+|---|---|---|
+| `Latency` | Required delay: 1–60,000 ms; optional 1–100% request selection | Executed by the sample payment gateway with non-blocking `Task.Delay` |
+| `HttpFailure` | Optional 500–599 response (default 503); optional 1–100% request selection | Executed by the sample payment gateway by short-circuiting requests |
+| `CpuSpike` | Lease duration only | Persisted and distributed, but not executed by the sample service |
+| `None` | No additional parameters | Clears the target's active experiment |
 
-## Working conventions for the next iteration
+Every non-clear experiment has a lease of 1–3,600 seconds, defaulting to 300 seconds. The API defaults `Percent` to 100. Only one active experiment may exist per target; a new command clears or replaces any existing active experiment for that target.
 
-- Preserve the three registered target keys unless the API contract and UI are changed together.
-- Keep validation at the API boundary and enforce invariants in the orchestration implementation as well.
-- Treat chaos injection endpoints as privileged control-plane actions.
-- Avoid claiming that a fault is being executed until a real execution mechanism exists.
-- Verify changes with a solution build and focused automated tests; verify Docker Compose configuration after setting the required certificate environment variables.
+## Persistence and lifecycle
+
+`DatabaseChaosOrchestrator` is a singleton using `IDbContextFactory<StriaDbContext>` to create short-lived EF Core contexts. It stores every experiment in PostgreSQL rather than holding active state only in memory.
+
+`ChaosExperiments` includes target, fault details, status, creation time, expiration time, triggering identity, and clearing details. Database constraints enforce fault parameter invariants and a partial unique index ensures no target has more than one active row.
+
+An experiment is considered active only when its status is `Active` and its lease has not expired. Reads enforce that rule themselves, so an expired fault stops being served immediately even if the cleanup worker has not run. `ExperimentExpiryService` periodically marks expired rows `Cleared` as `system:expiry`. `ExperimentRetentionService` periodically removes only cleared rows according to configurable age and count limits.
+
+## Data-plane behavior
+
+The sample service uses `FaultPoller` to request `/api/chaos/directives/PaymentGateway` once per second by default.
+
+- `200 OK` with a directive: replace the local directive lease.
+- `204 No Content`: clear the local directive immediately.
+- A network/control-plane failure: retain the most recent directive only until its already-issued local lease expires.
+
+The local lease uses a monotonic `TimeProvider` timestamp, so wall-clock changes and clock skew cannot extend a fault. Fault middleware excludes `/healthz`, preserving service health checks while faults affect `/work`. It caps concurrent delayed requests to prevent a latency experiment from exhausting the sample process.
+
+The sample service does not execute `CpuSpike`; it logs that the fault is unsupported and serves normally.
+
+## HTTP API
+
+- `GET /api/chaos/faults` returns all active, unexpired experiments.
+- `GET /api/chaos/directives/{service}` returns an active `FaultDirective`, `204 No Content` when none is active, or `404 Not Found` for an unknown target.
+- `POST /api/chaos/inject` validates and activates or replaces an experiment. A request with `faultType: "None"` clears the active experiment.
+
+For example:
+
+```json
+{
+  "targetService": "PaymentGateway",
+  "faultType": "Latency",
+  "latencyMs": 750,
+  "durationSeconds": 120,
+  "percent": 50
+}
+```
+
+The server ignores the request body's `TriggeredBy` field and currently records the actor as `anonymous`, because authentication has not been configured.
+
+## User interface
+
+The home page presents fixed controls for each registered target:
+
+- Payment Gateway: 3-second latency.
+- Auth Service: HTTP 503.
+- Inventory API: CPU spike.
+
+It also polls active faults every three seconds and presents a per-service status bar and clear action. The UI currently shows only target, fault type, and latency; it does not display duration, percentage, status code, audit history, or target acknowledgement.
+
+## Known gaps and risks
+
+1. **No authentication or authorization.** All control and directive endpoints are unauthenticated. This is acceptable only for a loopback-only local demo, not an internal shared or public deployment.
+2. **Only one executable demo target.** The Compose stack runs only `sample-payment-gateway`. `AuthService` and `InventoryAPI` have no participating service.
+3. **`CpuSpike` is not implemented.** Stria can record and distribute it, but no service executes it.
+4. **No target acknowledgement.** Stria knows an experiment was requested, not whether a target received or applied the directive.
+5. **Server-rendered API client is hard-coded.** `Stria/Program.cs` registers its scoped `HttpClient` with `http://localhost:8080`, which may not work for every local launch or future HTTPS deployment configuration.
+6. **HTTPS is not configured for Compose.** The local stack intentionally exposes loopback HTTP. A hosted deployment needs TLS termination and secure external ingress.
+7. **No test project or CI pipeline.** The repository has no automated unit, integration, Compose smoke, image, or deployment validation.
+8. **Migration-on-startup is demo-oriented.** A controlled migration job or release step is safer for production rollouts.
+9. **Operational logging needs refinement.** `TrafficSimulatorService` does not generate traffic or apply faults; it produces routine logs and logs active faults at `Critical`, which can create alert noise.
+10. **The dashboard surfaces raw exception text.** Operator-facing errors should be concise while diagnostic detail stays in logs.
+
+## Recommended enhancement sequence
+
+1. Add a solution test suite for validation rules, persistence, lease expiry, retention, and API behavior.
+2. Add `/healthz` and `/readyz`, configuration validation, and remove or replace `TrafficSimulatorService`.
+3. Secure the control plane with OpenID Connect, operator/viewer roles, and server-derived audit identity.
+4. Add a registered service model with per-service fault capabilities and limits instead of hard-coded target names.
+5. Extract a supported data-plane integration package and add acknowledgement/status reporting from participating services.
+6. Improve the dashboard with experiment duration, percentage, status code, expiry countdown, lifecycle history, and target execution state.
+7. Add OpenTelemetry metrics/traces, structured logs, a global emergency kill switch, and environment-specific safety caps.
+8. Add CI to build, test, scan, publish immutable images, and perform a staged smoke deployment.
+9. Add infrastructure-as-code and deploy the dashboard/control plane behind authenticated HTTPS ingress while keeping data-plane targets private.
+
+## Working conventions
+
+- Treat fault injection as privileged control-plane activity.
+- Maintain lease-based automatic expiry; never rely on manual clearing for safety.
+- Keep execution mechanisms in the target data plane, not in the Stria host process.
+- Preserve `/healthz` as an unfaulted path for participating services.
+- Make target capabilities explicit and reject unsupported faults instead of claiming they ran.
+- Do not claim production readiness until access control, testing, observability, deployment safety, and rollback procedures are implemented and verified.
