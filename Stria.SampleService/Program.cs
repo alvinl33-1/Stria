@@ -9,7 +9,7 @@ builder.Services.AddOptions<StriaOptions>()
     .Validate(
         o => !string.IsNullOrWhiteSpace(o.ServiceName) 
              && Uri.TryCreate(o.BaseUrl, UriKind.Absolute, out _),
-        "Stria:ServiceName and an absolute Stria:BaseUrl are required.")
+        "Stria.API:ServiceName and an absolute Stria.API:BaseUrl are required.")
     .ValidateOnStart();
 
 builder.Services.AddSingleton(TimeProvider.System);

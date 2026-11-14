@@ -42,16 +42,16 @@ public class FaultInjectionMiddleware
         switch (directive.FaultType)
         {
             case "Latency" when directive.LatencyMs is int delayMs:
-                context.Response.Headers["X-Stria-Fault"] = $"Latency";
+                context.Response.Headers["X-Stria.API-Fault"] = $"Latency";
                 await DelayAsync(delayMs, context.RequestAborted);
                 await _next(context);
                 return;
             
             case "HttpFailure":
-                context.Response.Headers["X-Stria-Fault"] = "HttpFailure";
+                context.Response.Headers["X-Stria.API-Fault"] = "HttpFailure";
                 context.Response.StatusCode = directive.StatusCode ?? StatusCodes.Status503ServiceUnavailable;
                 await context.Response.WriteAsJsonAsync(
-                    new { error = "Fault injected by Stria.", fault = "HttpFailure" },
+                    new { error = "Fault injected by Stria.API.", fault = "HttpFailure" },
                     context.RequestAborted);
                 return;
             

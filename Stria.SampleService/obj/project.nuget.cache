@@ -1,12 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "AwC2KeEr8to=",
+  "dgSpecHash": "C3ogQsqRstg=",
   "success": true,
   "projectFilePath": "/Users/alvinl33/Desktop/Projects/Stria/Stria.SampleService/Stria.SampleService.csproj",
-  "expectedPackageFiles": [
-    "/Users/alvinl33/.nuget/packages/microsoft.netcore.app.ref/10.0.14/microsoft.netcore.app.ref.10.0.14.nupkg.sha512",
-    "/Users/alvinl33/.nuget/packages/microsoft.aspnetcore.app.ref/10.0.14/microsoft.aspnetcore.app.ref.10.0.14.nupkg.sha512",
-    "/Users/alvinl33/.nuget/packages/microsoft.netcore.app.host.osx-arm64/10.0.14/microsoft.netcore.app.host.osx-arm64.10.0.14.nupkg.sha512"
-  ],
+  "expectedPackageFiles": [],
   "logs": []
 }

@@ -5,7 +5,7 @@ var e=!1;const t=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,
   "mainAssemblyName": "Stria.Client",
   "applicationEnvironment": "Development",
   "resources": {
-    "hash": "sha256-Sb7KOlcGs9kH8DIU+JqNskShBLXiaKhXfBhzaI6cYF8=",
+    "hash": "sha256-KKfL8AR7PBSGaHLFSbzYu/ChqqinjhpFUGbg0Ye/uU8=",
     "jsModuleNative": [
       {
         "name": "dotnet.native.bjoj0wmylw.js"
@@ -1242,27 +1242,27 @@ var e=!1;const t=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,
       },
       {
         "virtualPath": "Stria.Client.wasm",
-        "name": "Stria.Client.mfakmwfkoc.wasm",
-        "hash": "sha256-0re9nmzIy/929YnPZ09yh4dUmBM8yY0FYF2mEnTa6go=",
+        "name": "Stria.Client.9vs3jsyry3.wasm",
+        "hash": "sha256-G4gt5OH98wOhLd0h10ZLipZOoM9KRIXhA64/Hz3HQBM=",
         "cache": "force-cache"
       }
     ],
     "pdb": [
       {
         "virtualPath": "Stria.Client.pdb",
-        "name": "Stria.Client.hyuhb6lnw9.pdb",
-        "hash": "sha256-+YnOZALk6VcR16P7kZdYT9joxJKqzyEu/cTIYJR/NJM=",
+        "name": "Stria.Client.57yo0ca1v1.pdb",
+        "hash": "sha256-36y2rOsyb7e69rqr058Sd5eNJ3T289PeL9/jgvJhzRA=",
         "cache": "force-cache"
       }
     ],
     "libraryInitializers": [
       {
-        "name": "_framework/Microsoft.NET.Sdk.WebAssembly.DotNetWatch.cy07cqg8cu.lib.module.js"
+        "name": "_framework/Microsoft.DotNet.HotReload.WebAssembly.Browser.hdl7ay4ywj.lib.module.js"
       }
     ],
     "modulesAfterConfigLoaded": [
       {
-        "name": "../_framework/Microsoft.NET.Sdk.WebAssembly.DotNetWatch.cy07cqg8cu.lib.module.js"
+        "name": "../_framework/Microsoft.DotNet.HotReload.WebAssembly.Browser.hdl7ay4ywj.lib.module.js"
       }
     ]
   },
@@ -1285,13 +1285,13 @@ var e=!1;const t=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,
         "System.ComponentModel.TypeConverter.EnableUnsafeBinaryFormatterInDesigntimeLicenseContextSerialization": false,
         "System.ComponentModel.TypeDescriptor.IsComObjectDescriptorSupported": false,
         "System.Data.DataSet.XmlSerializationIsSupported": false,
-        "System.Diagnostics.Metrics.Meter.IsSupported": true,
-        "System.Diagnostics.Tracing.EventSource.IsSupported": true,
+        "System.Diagnostics.Metrics.Meter.IsSupported": false,
+        "System.Diagnostics.Tracing.EventSource.IsSupported": false,
         "System.GC.Server": true,
         "System.Globalization.Invariant": false,
         "System.TimeZoneInfo.Invariant": false,
         "System.Linq.Enumerable.IsSizeOptimized": true,
-        "System.Net.Http.EnableActivityPropagation": true,
+        "System.Net.Http.EnableActivityPropagation": false,
         "System.Net.Http.WasmEnableStreamingResponse": true,
         "System.Net.SocketsHttpHandler.Http3Support": false,
         "System.Reflection.Metadata.MetadataUpdater.IsSupported": false,

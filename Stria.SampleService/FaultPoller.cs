@@ -50,7 +50,7 @@ public sealed class FaultPoller : BackgroundService
             catch (Exception ex)
             {
                 if (!_unreachable)
-                    _logger.LogWarning(ex, "Unable to poll Stria for {Service}; keeping the current fault lease until it expires.", _options.ServiceName);
+                    _logger.LogWarning(ex, "Unable to poll Stria.API for {Service}; keeping the current fault lease until it expires.", _options.ServiceName);
                 _unreachable = true;
             }
         } while (await timer.WaitForNextTickAsync(stoppingToken));
@@ -69,7 +69,7 @@ public sealed class FaultPoller : BackgroundService
         _state.Apply(directive);
         if (_unreachable)
         {
-            _logger.LogInformation("Connection to Stria restored for {Service}.", _options.ServiceName);
+            _logger.LogInformation("Connection to Stria.API restored for {Service}.", _options.ServiceName);
             _unreachable = false;
         }
         LogTransition(directive);
@@ -94,7 +94,7 @@ public sealed class FaultPoller : BackgroundService
         else
         {
             _logger.LogWarning(
-                "{Fault} is active in Stria, but this sample service does not execute it yet.",
+                "{Fault} is active in Stria.API, but this sample service does not execute it yet.",
                 directive.FaultType);
         }
     }

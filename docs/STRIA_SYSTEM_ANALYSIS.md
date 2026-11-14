@@ -116,7 +116,7 @@ It also polls active faults every three seconds and presents a per-service statu
 2. **Only one executable demo target.** The Compose stack runs only `sample-payment-gateway`. `AuthService` and `InventoryAPI` have no participating service.
 3. **`CpuSpike` is not implemented.** Stria can record and distribute it, but no service executes it.
 4. **No target acknowledgement.** Stria knows an experiment was requested, not whether a target received or applied the directive.
-5. **Server-rendered API client is hard-coded.** `Stria/Program.cs` registers its scoped `HttpClient` with `http://localhost:8080`, which may not work for every local launch or future HTTPS deployment configuration.
+5. **Server-rendered API client is hard-coded.** `../Stria.API` registers its scoped `HttpClient` with `http://localhost:8080`, which may not work for every local launch or future HTTPS deployment configuration.
 6. **HTTPS is not configured for Compose.** The local stack intentionally exposes loopback HTTP. A hosted deployment needs TLS termination and secure external ingress.
 7. **No test project or CI pipeline.** The repository has no automated unit, integration, Compose smoke, image, or deployment validation.
 8. **Migration-on-startup is demo-oriented.** A controlled migration job or release step is safer for production rollouts.
