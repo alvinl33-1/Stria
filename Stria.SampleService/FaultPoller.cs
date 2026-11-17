@@ -1,9 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.Extensions.Options;
- 
+
 namespace Stria.SampleService;
- 
+
 /// <summary>
 /// Polls Stria for this service's directive. Failure handling is the point:
 ///   * 204 (no fault)  -> clear immediately.
@@ -16,10 +16,10 @@ public sealed class FaultPoller : BackgroundService
     private readonly FaultState _state;
     private readonly StriaOptions _options;
     private readonly ILogger<FaultPoller> _logger;
- 
+
     private Guid? _lastExperimentId;
     private bool _unreachable;
- 
+
     public FaultPoller(
         IHttpClientFactory httpFactory,
         FaultState state,
@@ -74,7 +74,7 @@ public sealed class FaultPoller : BackgroundService
         }
         LogTransition(directive);
     }
-    
+
     private void LogTransition(FaultDirective? directive)
     {
         if (directive?.ExperimentId == _lastExperimentId)
@@ -88,7 +88,7 @@ public sealed class FaultPoller : BackgroundService
         }
         else if (directive.FaultType is "Latency" or "HttpFailure")
         {
-            _logger.LogWarning("Applying {Fault} to {Service} for {Remaining}s", 
+            _logger.LogWarning("Applying {Fault} to {Service} for {Remaining}s",
                 directive.FaultType, _options.ServiceName, directive.RemainingSeconds);
         }
         else

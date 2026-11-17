@@ -8,9 +8,9 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
 // Register a scoped HttpClient instance.
 // BaseAddress automatically targets the exact server origin URL hosting the app.
-builder.Services.AddScoped(sp => new HttpClient 
-{ 
-    BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) 
+builder.Services.AddScoped(sp => new HttpClient
+{
+    BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
 });
 
 await builder.Build().RunAsync();

@@ -7,7 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOptions<StriaOptions>()
     .Bind(builder.Configuration.GetSection(StriaOptions.SectionName))
     .Validate(
-        o => !string.IsNullOrWhiteSpace(o.ServiceName) 
+        o => !string.IsNullOrWhiteSpace(o.ServiceName)
              && Uri.TryCreate(o.BaseUrl, UriKind.Absolute, out _),
         "Stria:ServiceName and an absolute Stria:BaseUrl are required.")
     .ValidateOnStart();

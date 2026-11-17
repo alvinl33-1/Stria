@@ -7,9 +7,9 @@ namespace Stria.DTOs;
 /// machines cannot stretch or shorten a fault.
 /// </summary>
 public record FaultDirective(
-    Guid ExperimentId, 
+    Guid ExperimentId,
     string FaultType,
     int? LatencyMs,
-    int Percent, 
+    int Percent,
     int? StatusCode,
     int RemainingSeconds);

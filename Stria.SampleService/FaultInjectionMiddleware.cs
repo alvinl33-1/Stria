@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Options;
- 
+
 namespace Stria.SampleService;
- 
+
 /// <summary>
 /// The data plane's enforcement point. For each request it asks FaultState what (if anything)
 /// is active, then:
@@ -15,9 +15,9 @@ public class FaultInjectionMiddleware
     private readonly FaultState _state;
     private readonly StriaOptions _options;
     private readonly ILogger<FaultInjectionMiddleware> _logger;
- 
+
     private int _delayedInFlight;
- 
+
     public FaultInjectionMiddleware(
         RequestDelegate next,
         FaultState state,
@@ -29,7 +29,7 @@ public class FaultInjectionMiddleware
         _options = options.Value;
         _logger = logger;
     }
-    
+
     public async Task InvokeAsync(HttpContext context)
     {
         var directive = _state.GetActive();
@@ -46,7 +46,7 @@ public class FaultInjectionMiddleware
                 await DelayAsync(delayMs, context.RequestAborted);
                 await _next(context);
                 return;
-            
+
             case "HttpFailure":
                 context.Response.Headers["X-Stria.API-Fault"] = "HttpFailure";
                 context.Response.StatusCode = directive.StatusCode ?? StatusCodes.Status503ServiceUnavailable;
@@ -54,13 +54,13 @@ public class FaultInjectionMiddleware
                     new { error = "Fault injected by Stria.API.", fault = "HttpFailure" },
                     context.RequestAborted);
                 return;
-            
+
             default:
                 await _next(context);
                 return;
         }
     }
-    
+
     /// <summary>Percent = share of requests affected. 100 means every request.</summary>
     private static bool IsSelected(int percent) =>
         percent >= 100 || Random.Shared.Next(100) < percent;

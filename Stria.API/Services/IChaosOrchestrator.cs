@@ -12,9 +12,9 @@ public interface IChaosOrchestrator
     /// </summary>
     Task InjectFaultAsync(FaultInjectionRequest request, string triggeredBy,
         CancellationToken cancellationToken = default);
-    Task<ChaosExperiment?> GetActiveFaultForServiceAsync(string serviceName, 
+    Task<ChaosExperiment?> GetActiveFaultForServiceAsync(string serviceName,
         CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ChaosExperiment>> GetAllActiveFaultsAsync(CancellationToken cancellationToken = default);
-    
+
     Task<int> ExpireDueFaultsAsync(CancellationToken cancellationToken = default);
 }
