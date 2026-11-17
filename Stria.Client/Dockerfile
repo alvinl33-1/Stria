@@ -1,5 +1,5 @@
 # Build the Blazor WebAssembly app from the repository root.
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS publish
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS publish
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["Stria.Client/Stria.Client.csproj", "Stria.Client/"]
