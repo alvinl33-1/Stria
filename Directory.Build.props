@@ -1,0 +1,13 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- NuGet audit covers transitive packages as well as direct references. Vulnerabilities
+         surface as NU190x warnings; CI also runs an explicit vulnerability report. -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+
+    <!-- Deterministic paths and SourceLink metadata for CI-produced assemblies. -->
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+</Project>

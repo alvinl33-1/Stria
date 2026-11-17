@@ -9,6 +9,9 @@
 **/bin/
 **/obj/
 artifacts/
+TestResults/
+*.trx
+coverage.*.xml
 
 # IDE and editor files
 .idea/

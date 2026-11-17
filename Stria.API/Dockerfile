@@ -11,7 +11,7 @@ COPY ["Stria.API/Stria.API.csproj", "Stria.API/"]
 COPY ["Stria.Client/Stria.Client.csproj", "Stria.Client/"]
 RUN dotnet restore "Stria.API/Stria.API.csproj"
 COPY . .
-RUN dotnet publish "Stria.API/Stria.API.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "Stria.API/Stria.API.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false --no-restore
 
 FROM runtime AS final
 WORKDIR /app

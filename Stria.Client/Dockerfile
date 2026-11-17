@@ -5,7 +5,7 @@ WORKDIR /src
 COPY ["Stria.Client/Stria.Client.csproj", "Stria.Client/"]
 RUN dotnet restore "Stria.Client/Stria.Client.csproj"
 COPY . .
-RUN dotnet publish "Stria.Client/Stria.Client.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "Stria.Client/Stria.Client.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false --no-restore
 
 # Serve the published static WebAssembly files with SPA route fallback.
 FROM nginx:alpine AS final

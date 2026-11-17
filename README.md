@@ -44,9 +44,33 @@ curl -i http://localhost:8080/healthz
 curl -i http://localhost:8080/readyz
 ```
 
-## HTTP API
+## CI and quality gates
 
-GitHub Actions runs restore, Release build, and unit/integration tests on pushes and pull requests targeting `main`. Integration tests use Testcontainers and PostgreSQL; CI fails if Docker-backed tests cannot start. Configure the repository's `main` branch rules to require the `build-and-test` check before merging.
+GitHub Actions runs on pushes and pull requests to `main`:
+
+| Job | What it proves |
+|---|---|
+| `build-and-test` | Formatting is clean, the Release build has no warnings, all tests pass, and TRX/coverage evidence is uploaded |
+| `dependency-audit` | No known vulnerable direct or transitive NuGet packages are referenced |
+| `dependency-review` | A pull request does not introduce high-severity vulnerable dependencies (pull requests only) |
+| `container-build` | The control-plane, standalone dashboard, and sample-service Dockerfiles still build |
+
+Integration tests use Testcontainers and PostgreSQL. CI sets `STRIA_REQUIRE_DOCKER_TESTS=true`, so the job fails rather than silently skipping PostgreSQL coverage when Docker cannot start. Dependabot checks NuGet packages, GitHub Actions, and Docker base images weekly.
+
+Run the same .NET gates locally with:
+
+```sh
+dotnet restore Stria.sln
+dotnet format Stria.sln --verify-no-changes
+dotnet build Stria.sln --configuration Release --no-restore -warnaserror
+dotnet test Stria.sln --configuration Release --no-build
+```
+
+Configure `main` branch protection to require `build-and-test`, `dependency-audit`, and `container-build`, plus `dependency-review` for pull requests. Administrators can bypass these rules; do not use that bypass for normal changes.
+
+The Phase 2 security plan is in [docs/PHASE_2_PLAN.md](docs/PHASE_2_PLAN.md).
+
+## HTTP API
 
 `GET /api/v1/chaos/faults` returns active, unexpired experiments.
 

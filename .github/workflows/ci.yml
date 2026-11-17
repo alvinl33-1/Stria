@@ -5,15 +5,29 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+# Supersede an in-flight PR run when the branch is updated. Let main runs finish so the
+# deployment history stays complete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_NOLOGO: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+  # Integration tests fail instead of silently skipping when Docker/Testcontainers is unavailable.
+  STRIA_REQUIRE_DOCKER_TESTS: "true"
+
 jobs:
   build-and-test:
+    name: build-and-test
     runs-on: ubuntu-latest
-    env:
-      STRIA_REQUIRE_DOCKER_TESTS: "true"
+    timeout-minutes: 25
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -22,12 +36,122 @@ jobs:
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            Directory.Build.props
 
-      - name: Restore
+      - name: Restore dependencies
         run: dotnet restore Stria.sln
 
-      - name: Build
-        run: dotnet build Stria.sln --configuration Release --no-restore
+      - name: Verify formatting
+        run: dotnet format Stria.sln --verify-no-changes --no-restore
 
-      - name: Test
-        run: dotnet test Stria.sln --configuration Release --no-build --logger "trx;LogFileName=test-results.trx"
+      - name: Build with warnings as errors
+        run: dotnet build Stria.sln --configuration Release --no-restore -warnaserror
+
+      - name: Test with coverage
+        run: >
+          dotnet test Stria.sln
+          --configuration Release
+          --no-build
+          --results-directory TestResults
+          --logger "trx;LogFileName=test-results.trx"
+          --collect:"XPlat Code Coverage"
+
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: test-results
+          path: |
+            TestResults/**/*.trx
+            TestResults/**/coverage.cobertura.xml
+          if-no-files-found: warn
+          retention-days: 7
+
+  dependency-audit:
+    name: dependency-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            Directory.Build.props
+
+      - name: Restore dependencies
+        run: dotnet restore Stria.sln
+
+      - name: Audit NuGet packages
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          projects=(
+            Stria.API/Stria.API.csproj
+            Stria.Client/Stria.Client.csproj
+            Stria.SampleService/Stria.SampleService.csproj
+            Stria.Tests/Stria.Tests.csproj
+          )
+
+          report="$(mktemp)"
+          for project in "${projects[@]}"; do
+            dotnet package list \
+              --project "$project" \
+              --vulnerable \
+              --include-transitive \
+              --format json \
+              --no-restore
+          done | jq -s '[.[].projects[] | .. | objects | select(has("vulnerabilities")) | .vulnerabilities[]]' > "$report"
+
+          count="$(jq 'length' "$report")"
+          if [ "$count" -ne 0 ]; then
+            echo "::error::Found $count vulnerable NuGet package reference(s)."
+            jq . "$report"
+            exit 1
+          fi
+
+          echo "No vulnerable NuGet packages found."
+
+  dependency-review:
+    name: dependency-review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: never
+
+  container-build:
+    name: container-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build control-plane image
+        run: docker build --file Stria.API/Dockerfile --tag stria-api:ci .
+
+      - name: Build standalone dashboard image
+        run: docker build --file Stria.Client/Dockerfile --tag stria-client:ci .
+
+      - name: Build sample data-plane image
+        run: docker build --file Stria.SampleService/Dockerfile --tag stria-sample:ci .
