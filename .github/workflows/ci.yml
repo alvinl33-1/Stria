@@ -123,7 +123,9 @@ jobs:
 
   dependency-review:
     name: dependency-review
-    if: github.event_name == 'pull_request'
+    # Dependency review is available on public repositories. Private repositories need GitHub
+    # Advanced Security, so skip this job rather than failing PRs on a licensing gap.
+    if: github.event_name == 'pull_request' && github.event.repository.private == false
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

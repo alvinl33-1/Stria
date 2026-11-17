@@ -52,7 +52,7 @@ GitHub Actions runs on pushes and pull requests to `main`:
 |---|---|
 | `build-and-test` | Formatting is clean, the Release build has no warnings, all tests pass, and TRX/coverage evidence is uploaded |
 | `dependency-audit` | No known vulnerable direct or transitive NuGet packages are referenced |
-| `dependency-review` | A pull request does not introduce high-severity vulnerable dependencies (pull requests only) |
+| `dependency-review` | A pull request does not introduce high-severity vulnerable dependencies (public repositories; private repositories need GitHub Advanced Security) |
 | `container-build` | The control-plane, standalone dashboard, and sample-service Dockerfiles still build |
 
 Integration tests use Testcontainers and PostgreSQL. CI sets `STRIA_REQUIRE_DOCKER_TESTS=true`, so the job fails rather than silently skipping PostgreSQL coverage when Docker cannot start. Dependabot checks NuGet packages, GitHub Actions, and Docker base images weekly.
@@ -66,7 +66,7 @@ dotnet build Stria.sln --configuration Release --no-restore -warnaserror
 dotnet test Stria.sln --configuration Release --no-build
 ```
 
-Configure `main` branch protection to require `build-and-test`, `dependency-audit`, and `container-build`, plus `dependency-review` for pull requests. Administrators can bypass these rules; do not use that bypass for normal changes.
+Configure `main` branch protection to require `build-and-test`, `dependency-audit`, and `container-build`. The `dependency-review` job starts running when the repository is public; private repositories need GitHub Advanced Security for it, so do not require it while the repository is private. Administrators can bypass these rules; do not use that bypass for normal changes.
 
 The Phase 2 security plan is in [docs/PHASE_2_PLAN.md](docs/PHASE_2_PLAN.md).
 

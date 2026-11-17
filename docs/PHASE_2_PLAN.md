@@ -182,7 +182,8 @@ shows a persistent banner while it is engaged.
 - Add a formatting gate, warnings-as-errors build, PostgreSQL/Testcontainers tests, coverage
   collection, and test-result artifacts.
 - Add a NuGet vulnerability audit for direct and transitive packages.
-- Add pull-request dependency review for newly introduced vulnerable dependencies.
+- Add pull-request dependency review when the repository is public. Private repositories need
+  GitHub Advanced Security, so the always-on NuGet vulnerability audit remains the primary gate.
 - Build the control-plane, dashboard, and sample-service container images on every change.
 - Add Dependabot updates for NuGet, GitHub Actions, and Docker base images.
 - Stop tracking generated `bin/`/`obj/` artifacts so clean checkouts stay clean.
