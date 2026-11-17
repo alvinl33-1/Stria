@@ -34,7 +34,7 @@ public sealed class FaultPoller : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var url = $"/api/chaos/directives/{Uri.EscapeDataString(_options.ServiceName)}";
+        var url = $"/api/v1/chaos/directives/{Uri.EscapeDataString(_options.ServiceName)}";
         using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(Math.Max(250, _options.PollIntervalMs)));
 
         do

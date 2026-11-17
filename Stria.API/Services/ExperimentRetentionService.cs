@@ -60,7 +60,9 @@ public sealed class ExperimentRetentionService : BackgroundService
         while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 
-    private async Task SweepAsync(CancellationToken ct)
+    // internal: exercised directly by Stria.Tests (InternalsVisibleTo) so the retention rules
+    // can be verified without waiting for the periodic timer.
+    internal async Task SweepAsync(CancellationToken ct)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
         var removed = 0;

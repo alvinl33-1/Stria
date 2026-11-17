@@ -1,4 +1,4 @@
-﻿services:
+services:
   stria-server:
     container_name: stria-server
     build:
@@ -13,9 +13,12 @@
       Database__MigrateOnStartup: "true"   # local/Compose convenience; leave off elsewhere
       Retention__MaxAgeDays: "90"
       Retention__MaxClearedExperiments: "10000"
+      DataProtection__KeysPath: "/var/lib/stria/dpkeys"
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - stria-dpkeys:/var/lib/stria/dpkeys
 
   db:
     image: postgres:16
@@ -33,21 +36,20 @@
       retries: 10
     # No "ports:" on purpose: the database is reachable only from other Compose services.
 
-
-    
   sample-payment-gateway:
-    build: 
+    build:
       context: .
       dockerfile: Stria.SampleService/Dockerfile
     environment:
-      Stria__BaseUrl: "http://stria-server:8080"       # private HTTP listener, not published to the host
+      Stria__BaseUrl: "http://stria-server:8080"
       Stria__ServiceName: "PaymentGateway"
       Stria__PollIntervalMs: "1000"
     ports:
-      - "127.0.0.1:8081:8080"                   # loopback only; use it to curl /work
+      - "127.0.0.1:8081:8080"
     depends_on:
       - stria-server
     restart: unless-stopped
 
 volumes:
   stria-pgdata:
+  stria-dpkeys:

@@ -99,7 +99,7 @@
     {
         try
         {
-            _faults = await Http.GetFromJsonAsync<List<ChaosFault>>("/api/chaos/faults", _pollCancellation.Token) ?? [];
+            _faults = await Http.GetFromJsonAsync<List<ChaosFault>>("/api/v1/chaos/faults", _pollCancellation.Token) ?? [];
             _message = string.Empty;
         }
         catch (OperationCanceledException) when (_pollCancellation.IsCancellationRequested)
@@ -123,7 +123,7 @@
         try
         {
             var request = new FaultInjectionRequest(targetService, "None");
-            using var response = await Http.PostAsJsonAsync("/api/chaos/inject", request, _pollCancellation.Token);
+            using var response = await Http.PostAsJsonAsync("/api/v1/chaos/inject", request, _pollCancellation.Token);
             if (response.IsSuccessStatusCode)
                 await RefreshFaults();
             else

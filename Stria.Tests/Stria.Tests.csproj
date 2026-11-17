@@ -8,15 +8,25 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="MSTest" Version="4.0.2"/>
+        <PackageReference Include="coverlet.collector" Version="10.1.1">
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+          <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
+        <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.14" />
+        <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.11.0" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
+        <PackageReference Include="MSTest" Version="4.0.2" />
+        <PackageReference Include="Testcontainers.PostgreSql" Version="4.16.0" />
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Stria\Stria.csproj" />
+        <!-- Only the API host: SampleService also has a top-level Program and would collide
+             with WebApplicationFactory&lt;Program&gt;. Add sample-service tests in a separate project later. -->
+        <ProjectReference Include="..\Stria.API\Stria.API.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-        <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting"/>
+        <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
     </ItemGroup>
 
 </Project>

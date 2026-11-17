@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stria", "Stria\Stria.csproj", "{042982FC-098D-4A53-8B52-244AA296AA24}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stria.API", "Stria.API\Stria.API.csproj", "{042982FC-098D-4A53-8B52-244AA296AA24}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Stria.Client", "Stria.Client\Stria.Client.csproj", "{68A0AB1A-0A5C-4BE4-A57D-677EC28ABB81}"
 EndProject

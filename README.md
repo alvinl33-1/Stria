@@ -35,15 +35,24 @@ Compose starts PostgreSQL, waits for its health check, starts Stria, and starts 
 - `http://localhost:8081/work` — sample service work endpoint.
 - `http://localhost:8081/healthz` — sample service health endpoint.
 
-Stop the stack with `Ctrl+C`; use `docker compose down` to stop and remove the containers. The named `stria-pgdata` volume retains database contents when containers are removed.
+Stop the stack with `Ctrl+C`; use `docker compose down` to stop and remove the containers. The named `stria-pgdata` volume retains database contents when containers are removed, and `stria-dpkeys` retains Data Protection keys.
+
+For a smoke test, open the dashboard, inject bounded latency for `PaymentGateway`, and call `http://localhost:8081/work` repeatedly to observe the delay. Clear the fault and confirm the delay stops after the lease expires. The API process and database readiness endpoints should both return `200`:
+
+```sh
+curl -i http://localhost:8080/healthz
+curl -i http://localhost:8080/readyz
+```
 
 ## HTTP API
 
-`GET /api/chaos/faults` returns active, unexpired experiments.
+GitHub Actions runs restore, Release build, and unit/integration tests on pushes and pull requests targeting `main`. Integration tests use Testcontainers and PostgreSQL; CI fails if Docker-backed tests cannot start. Configure the repository's `main` branch rules to require the `build-and-test` check before merging.
 
-`GET /api/chaos/directives/{service}` returns the directive for a registered service, or `204 No Content` when it has no active fault. An unknown target returns `404`.
+`GET /api/v1/chaos/faults` returns active, unexpired experiments.
 
-`POST /api/chaos/inject` creates or replaces a target's active experiment. Send JSON such as:
+`GET /api/v1/chaos/directives/{service}` returns the directive for a registered service, or `204 No Content` when it has no active fault. An unknown target returns a `404` problem detail.
+
+`POST /api/v1/chaos/inject` creates or replaces a target's active experiment. Send JSON such as:
 
 ```json
 {
@@ -55,10 +64,10 @@ Stop the stack with `Ctrl+C`; use `docker compose down` to stop and remove the c
 }
 ```
 
-For an HTTP failure, use `"faultType": "HttpFailure"` and optionally set `"statusCode": 502` and `"percent": 25`. To clear a target, send `{"targetService":"PaymentGateway","faultType":"None"}`. Invalid targets, fault types, or parameter ranges return `400 Bad Request`.
+For an HTTP failure, use `"faultType": "HttpFailure"` and optionally set `"statusCode": 502` and `"percent": 25`. To clear a target, send `{"targetService":"PaymentGateway","faultType":"None"}`. Invalid targets, fault types, or parameter ranges return `400 Bad Request` with an RFC 7807 `application/problem+json` body.
 
 ## Sample service configuration
 
 The sample service reads `Stria:BaseUrl`, `Stria:ServiceName`, `Stria:PollIntervalMs`, and `Stria:MaxConcurrentDelayed` from configuration. In Compose these are provided as environment variables. It polls once per second by default, keeps an existing fault lease when Stria is temporarily unreachable, and lets that lease expire locally rather than extending it.
 
-The Stria host reads its PostgreSQL connection string from `ConnectionStrings:Stria`. `Database:MigrateOnStartup` controls whether migrations run at startup. Retention settings are `Retention:MaxAgeDays`, `Retention:MaxClearedExperiments`, and `Retention:SweepIntervalMinutes`; expiry sweeps use `Expiry:SweepIntervalSeconds`.
+The Stria host reads its PostgreSQL connection string from `ConnectionStrings:Stria`. `Database:MigrateOnStartup` controls whether migrations run at startup. Retention settings are `Retention:MaxAgeDays`, `Retention:MaxClearedExperiments`, and `Retention:SweepIntervalMinutes`; expiry sweeps use `Expiry:SweepIntervalSeconds`. Data Protection keys are stored at `DataProtection:KeysPath`.

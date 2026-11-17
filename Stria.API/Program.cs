@@ -1,7 +1,9 @@
 // Stria.API/Program.cs
  
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Components;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Stria;
 using Stria.Components;
 using Stria.Data;
@@ -10,25 +12,25 @@ using Stria.DTOs;
 using Stria.Services;
  
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddProblemDetails();
  
 // Services
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
     .AddInteractiveWebAssemblyComponents();
  
-// Home.razor is shared by WebAssembly and server render modes. During an
-// interactive server circuit, use the current host as the API base address.
-// NOTE: unchanged in this iteration; still hard-coded and tracked as a separate item.
-builder.Services.AddScoped(_ => new HttpClient
+// Use the browser's current origin for server-rendered interactive components. This keeps
+// API calls valid behind HTTPS ingress and avoids environment-specific hostnames.
+builder.Services.AddScoped(sp => new HttpClient
 {
-    BaseAddress = new Uri("http://localhost:8080")
+    BaseAddress = new Uri(sp.GetRequiredService<NavigationManager>().BaseUri)
 });
  
 // Persistence. A DbContext *factory* (not a scoped DbContext) lets the singleton orchestrator
 // and the hosted services create a short-lived context per operation.
-var connectionString = builder.Configuration.GetConnectionString("Stria.API")
+var connectionString = builder.Configuration.GetConnectionString("Stria")
     ?? throw new InvalidOperationException(
-        "Connection string 'Stria.API' is not configured. Set ConnectionStrings__Stria (never commit credentials).");
+        "Connection string 'Stria' is not configured. Set ConnectionStrings__Stria (never commit credentials).");
 builder.Services.AddDbContextFactory<StriaDbContext>(options => options.UseNpgsql(connectionString));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.Configure<ExperimentRetentionOptions>(
@@ -43,7 +45,8 @@ builder.Services.AddHostedService<ExperimentExpiryService>();
  
 builder.Services.AddDataProtection()
     .SetApplicationName("Stria.API")
-    .PersistKeysToFileSystem(new DirectoryInfo("/var/lib/stria/dpkeys"));
+    .PersistKeysToFileSystem(new DirectoryInfo(
+        builder.Configuration["DataProtection:KeysPath"] ?? "/var/lib/stria/dpkeys"));
  
 var app = builder.Build();
  
@@ -66,30 +69,56 @@ else
     app.UseHsts();
 }
  
-// Data-plane services poll /api/chaos/directives over the private Compose network on the
+// Data-plane services poll /api/v1/chaos/directives over the private Compose network on the
 // plain-HTTP listener (8080, not published to the host). Without this exemption the HTTPS
 // redirect would bounce them to a port whose dev certificate they don't trust.
 app.UseWhen(
-    ctx => !ctx.Request.Path.StartsWithSegments("/api/chaos/directives"),
+    ctx => !ctx.Request.Path.StartsWithSegments("/api/v1/chaos/directives"),
     branch => branch.UseHttpsRedirection());
 app.UseStaticFiles();
 app.UseAntiforgery();
- 
-app.MapGet("/api/chaos/faults", async (IChaosOrchestrator orchestrator, CancellationToken ct) =>
+app.UseStatusCodePages();
+
+app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
+app.MapGet("/readyz", async (
+    IDbContextFactory<StriaDbContext> dbFactory,
+    ILogger<Program> logger,
+    CancellationToken ct) =>
+{
+    try
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        return await db.Database.CanConnectAsync(ct)
+            ? Results.Ok(new { status = "ready" })
+            : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    }
+    catch (NpgsqlException ex)
+    {
+        logger.LogWarning(ex, "Readiness check could not connect to PostgreSQL.");
+        return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    }
+});
+
+var api = app.MapGroup("/api/v1");
+
+api.MapGet("/chaos/faults", async (IChaosOrchestrator orchestrator, CancellationToken ct) =>
     Results.Ok(await orchestrator.GetAllActiveFaultsAsync(ct)));
  
 // Data-plane feed: what should service {service} be doing right now?
 //   200 + FaultDirective  -> apply it for RemainingSeconds
 //   204                   -> no active fault
 //   404                   -> not a registered service
-app.MapGet("/api/chaos/directives/{service}", async (
+api.MapGet("/chaos/directives/{service}", async (
     string service,
     IChaosOrchestrator orchestrator,
     TimeProvider time,
     CancellationToken ct) =>
 {
     if (!ChaosRules.TryGetService(service, out var canonical))
-        return Results.NotFound(new { error = "Unknown target service." });
+        return Results.Problem(
+            statusCode: StatusCodes.Status404NotFound,
+            title: "Unknown target service.",
+            type: "about:blank");
  
     var experiment = await orchestrator.GetActiveFaultForServiceAsync(canonical, ct);
     if (experiment is null)
@@ -110,7 +139,7 @@ app.MapGet("/api/chaos/directives/{service}", async (
         remaining));
 });
  
-app.MapPost("/api/chaos/inject", async (
+api.MapPost("/chaos/inject", async (
     FaultInjectionRequest request,
     HttpContext http,
     IChaosOrchestrator orchestrator,
@@ -119,7 +148,11 @@ app.MapPost("/api/chaos/inject", async (
     // Validation (targets, fault types, parameter bounds) lives in ChaosRules and is
     // re-enforced inside the orchestrator.
     if (!ChaosRules.TryValidate(request, out _, out var error))
-        return Results.BadRequest(new { error });
+        return Results.Problem(
+            statusCode: StatusCodes.Status400BadRequest,
+            title: "Invalid fault injection request.",
+            detail: error,
+            type: "about:blank");
  
     // TriggeredBy is derived on the server and the client-supplied value is ignored, so the
     // audit trail cannot be spoofed. "anonymous" until authentication is added; once it is,
@@ -127,7 +160,7 @@ app.MapPost("/api/chaos/inject", async (
     var actor = http.User.Identity?.Name ?? "anonymous";
  
     await orchestrator.InjectFaultAsync(request, actor, ct);
-    return Results.Accepted("/api/chaos/faults", request with { TriggeredBy = actor });
+    return Results.Accepted("/api/v1/chaos/faults", request with { TriggeredBy = actor });
 });
  
 // 4. MAP ROOT UI PATHS

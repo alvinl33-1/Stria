@@ -14,9 +14,9 @@ The repository includes one participating data-plane service, `sample-payment-ga
 Browser
   └── Stria dashboard (Blazor WebAssembly + interactive server components)
         └── Stria host (ASP.NET Core)
-              ├── POST /api/chaos/inject
-              ├── GET  /api/chaos/faults
-              ├── GET  /api/chaos/directives/{service}
+              ├── POST /api/v1/chaos/inject
+              ├── GET  /api/v1/chaos/faults
+              ├── GET  /api/v1/chaos/directives/{service}
               ├── DatabaseChaosOrchestrator
               │     └── PostgreSQL / ChaosExperiments
               ├── ExperimentExpiryService
@@ -70,7 +70,7 @@ An experiment is considered active only when its status is `Active` and its leas
 
 ## Data-plane behavior
 
-The sample service uses `FaultPoller` to request `/api/chaos/directives/PaymentGateway` once per second by default.
+The sample service uses `FaultPoller` to request `/api/v1/chaos/directives/PaymentGateway` once per second by default.
 
 - `200 OK` with a directive: replace the local directive lease.
 - `204 No Content`: clear the local directive immediately.
@@ -82,9 +82,9 @@ The sample service does not execute `CpuSpike`; it logs that the fault is unsupp
 
 ## HTTP API
 
-- `GET /api/chaos/faults` returns all active, unexpired experiments.
-- `GET /api/chaos/directives/{service}` returns an active `FaultDirective`, `204 No Content` when none is active, or `404 Not Found` for an unknown target.
-- `POST /api/chaos/inject` validates and activates or replaces an experiment. A request with `faultType: "None"` clears the active experiment.
+- `GET /api/v1/chaos/faults` returns all active, unexpired experiments.
+- `GET /api/v1/chaos/directives/{service}` returns an active `FaultDirective`, `204 No Content` when none is active, or `404 Not Found` for an unknown target.
+- `POST /api/v1/chaos/inject` validates and activates or replaces an experiment. A request with `faultType: "None"` clears the active experiment.
 
 For example:
 

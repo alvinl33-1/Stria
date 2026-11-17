@@ -2,7 +2,7 @@ namespace Stria.SampleService;
 
 public sealed class StriaOptions
 {
-    public const string SectionName = "Stria.API";
+    public const string SectionName = "Stria";
 
     /// <summary>Where the Stria host is reachable from this service, e.g. http://stria:8080.</summary>
     public string BaseUrl { get; set; } = string.Empty;

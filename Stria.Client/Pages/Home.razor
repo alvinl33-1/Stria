@@ -78,7 +78,7 @@
         {
             int? latencyMs = string.Equals(faultType, "Latency", StringComparison.OrdinalIgnoreCase) ? 3000 : null;
             var payload = new FaultInjectionRequest(targetService, faultType, latencyMs);
-            using var response = await Http.PostAsJsonAsync("/api/chaos/inject", payload);
+            using var response = await Http.PostAsJsonAsync("/api/v1/chaos/inject", payload);
             if (response.IsSuccessStatusCode)
             {
                 var outcome = faultType == "None" ? "fault cleared" : $"{faultType} enabled";

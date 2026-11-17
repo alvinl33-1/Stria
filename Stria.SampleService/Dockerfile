@@ -1,11 +1,11 @@
-﻿# Build context: repository root.  docker build -f Stria.API.SampleService/Dockerfile .
+﻿# Build context: repository root.  docker build -f Stria.SampleService/Dockerfile .
 # Match the image tags to the TargetFramework of the projects (10.0).
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY Stria.SampleService/Stria.SampleService.csproj Stria.SampleService/
-RUN dotnet restore Stria.API.SampleService/Stria.API.SampleService.csproj
+RUN dotnet restore Stria.SampleService/Stria.SampleService.csproj
 COPY Stria.SampleService/ Stria.SampleService/
-RUN dotnet publish Stria.API.SampleService/Stria.API.SampleService.csproj -c Release -o /app/publish --no-restore
+RUN dotnet publish Stria.SampleService/Stria.SampleService.csproj -c Release -o /app/publish --no-restore
  
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
