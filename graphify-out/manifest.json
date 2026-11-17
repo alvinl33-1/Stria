@@ -1,0 +1,380 @@
+{
+  ".github/dependabot.yml": {
+    "mtime": 1794881280.7637281,
+    "seen": 1794937991.2293792,
+    "ast_hash": "50181f234752db231031bc9d3846e7ba",
+    "semantic_hash": "50181f234752db231031bc9d3846e7ba"
+  },
+  ".github/workflows/ci.yml": {
+    "mtime": 1794881691.3046181,
+    "seen": 1794937991.229383,
+    "ast_hash": "3b3c4d265e5d4c52c795815d1801f605",
+    "semantic_hash": "3b3c4d265e5d4c52c795815d1801f605"
+  },
+  ".junie/mcp/mcp.json": {
+    "mtime": 1794607886.810898,
+    "seen": 1794937991.229385,
+    "ast_hash": "ee6cd413bc66f831fc0ffaee2a96772e",
+    "semantic_hash": "ee6cd413bc66f831fc0ffaee2a96772e"
+  },
+  "Stria.API/Components/App.razor": {
+    "mtime": 1794626872.778,
+    "seen": 1794937991.229386,
+    "ast_hash": "12cca30c950faf512cce1778a0a2b0d0",
+    "semantic_hash": "12cca30c950faf512cce1778a0a2b0d0"
+  },
+  "Stria.API/Components/Pages/Error.razor": {
+    "mtime": 1794233126.03,
+    "seen": 1794937991.229387,
+    "ast_hash": "f130202a3bbe28934ef30719f10e92fb",
+    "semantic_hash": "f130202a3bbe28934ef30719f10e92fb"
+  },
+  "Stria.API/Components/_Imports.razor": {
+    "mtime": 1794233126.035,
+    "seen": 1794937991.229387,
+    "ast_hash": "4d1d293fcb4130672b0b4249e5124ea6",
+    "semantic_hash": "4d1d293fcb4130672b0b4249e5124ea6"
+  },
+  "Stria.API/DTOs/FaultDirective.cs": {
+    "mtime": 1794881216.251033,
+    "seen": 1794937991.229388,
+    "ast_hash": "e43d7ebd2535b991e55778f1d7cfafca",
+    "semantic_hash": "e43d7ebd2535b991e55778f1d7cfafca"
+  },
+  "Stria.API/DTOs/FaultInjectionRequest.cs": {
+    "mtime": 1794881216.2512388,
+    "seen": 1794937991.229389,
+    "ast_hash": "725953ccc53f520399aeb4d166f44967",
+    "semantic_hash": "725953ccc53f520399aeb4d166f44967"
+  },
+  "Stria.API/Data/Migrations/20261110180340_InitialCreate.Designer.cs": {
+    "mtime": 1794626872.765,
+    "seen": 1794937991.229389,
+    "ast_hash": "48e61e6413ef90ed24bf972023a74117",
+    "semantic_hash": "48e61e6413ef90ed24bf972023a74117"
+  },
+  "Stria.API/Data/Migrations/20261110180340_InitialCreate.cs": {
+    "mtime": 1794881216.2476053,
+    "seen": 1794937991.2293901,
+    "ast_hash": "f811b50994222bc953b5ac55ab1bbf05",
+    "semantic_hash": "f811b50994222bc953b5ac55ab1bbf05"
+  },
+  "Stria.API/Data/Migrations/StriaDbContextModelSnapshot.cs": {
+    "mtime": 1794626872.786,
+    "seen": 1794937991.2293901,
+    "ast_hash": "d083614285073bada5da5d38dfc24bcd",
+    "semantic_hash": "d083614285073bada5da5d38dfc24bcd"
+  },
+  "Stria.API/Data/StriaDbContext.cs": {
+    "mtime": 1794881216.2499907,
+    "seen": 1794937991.229391,
+    "ast_hash": "82005331ee03d44a0869981ac3189373",
+    "semantic_hash": "82005331ee03d44a0869981ac3189373"
+  },
+  "Stria.API/Domain/ChaosExperiment.cs": {
+    "mtime": 1794881216.2504654,
+    "seen": 1794937991.2293918,
+    "ast_hash": "db482c677b20051b22c084a1d8f94c24",
+    "semantic_hash": "db482c677b20051b22c084a1d8f94c24"
+  },
+  "Stria.API/Domain/ChaosRules.cs": {
+    "mtime": 1794881216.2508695,
+    "seen": 1794937991.2293918,
+    "ast_hash": "7efd9858d2131ded2fed62e71ef2b5d5",
+    "semantic_hash": "7efd9858d2131ded2fed62e71ef2b5d5"
+  },
+  "Stria.API/Program.cs": {
+    "mtime": 1794881057.4103632,
+    "seen": 1794937991.229393,
+    "ast_hash": "9aa5ceda3cf47f80109c7c16ba565cf2",
+    "semantic_hash": "9aa5ceda3cf47f80109c7c16ba565cf2"
+  },
+  "Stria.API/Properties/launchSettings.json": {
+    "mtime": 1794233121.419,
+    "seen": 1794937991.229394,
+    "ast_hash": "dbadbdf74dba537591d0d9d71c90d7dc",
+    "semantic_hash": "dbadbdf74dba537591d0d9d71c90d7dc"
+  },
+  "Stria.API/Services/DatabaseChaosOrchestrator.cs": {
+    "mtime": 1794881216.2515473,
+    "seen": 1794937991.229394,
+    "ast_hash": "ad96e4cd416fc75acb68d5b5d4171b30",
+    "semantic_hash": "ad96e4cd416fc75acb68d5b5d4171b30"
+  },
+  "Stria.API/Services/ExperimentExpiryService.cs": {
+    "mtime": 1794881216.251835,
+    "seen": 1794937991.229395,
+    "ast_hash": "f49b0854036463a502cf2244d1b4fc43",
+    "semantic_hash": "f49b0854036463a502cf2244d1b4fc43"
+  },
+  "Stria.API/Services/ExperimentRetentionService.cs": {
+    "mtime": 1794881216.25211,
+    "seen": 1794937991.229395,
+    "ast_hash": "aeb9ce4558d0eb59223568d8b1147f28",
+    "semantic_hash": "aeb9ce4558d0eb59223568d8b1147f28"
+  },
+  "Stria.API/Services/IChaosOrchestrator.cs": {
+    "mtime": 1794881216.252197,
+    "seen": 1794937991.2293959,
+    "ast_hash": "4447f95fd2c68121d572179c7810cb59",
+    "semantic_hash": "4447f95fd2c68121d572179c7810cb59"
+  },
+  "Stria.API/Stria.API.csproj": {
+    "mtime": 1794876735.086597,
+    "seen": 1794937991.2293959,
+    "ast_hash": "e0b005ba747839424511169c40dd8bab",
+    "semantic_hash": "e0b005ba747839424511169c40dd8bab"
+  },
+  "Stria.API/TrafficSimulatorService.cs": {
+    "mtime": 1794881216.2524736,
+    "seen": 1794937991.229397,
+    "ast_hash": "220c8f31933b5d0c3d36bfe6051a7577",
+    "semantic_hash": "220c8f31933b5d0c3d36bfe6051a7577"
+  },
+  "Stria.API/appsettings.Development.json": {
+    "mtime": 1794233121.421,
+    "seen": 1794937991.229398,
+    "ast_hash": "477a525a47fc9bdbbf94690e6633d843",
+    "semantic_hash": "477a525a47fc9bdbbf94690e6633d843"
+  },
+  "Stria.API/appsettings.json": {
+    "mtime": 1794233121.42,
+    "seen": 1794937991.229398,
+    "ast_hash": "732f4d75514e890746f0170256ed9654",
+    "semantic_hash": "732f4d75514e890746f0170256ed9654"
+  },
+  "Stria.Client/Components/ActiveFaultsTable.razor": {
+    "mtime": 1794876573.7123215,
+    "seen": 1794937991.229399,
+    "ast_hash": "dda3d1fd9ca692120baf62ac148f1c42",
+    "semantic_hash": "dda3d1fd9ca692120baf62ac148f1c42"
+  },
+  "Stria.Client/Layout/MainLayout.razor": {
+    "mtime": 1794254351.6674252,
+    "seen": 1794937991.229399,
+    "ast_hash": "f2d3dec0b221facc60d66011bbbe56ce",
+    "semantic_hash": "f2d3dec0b221facc60d66011bbbe56ce"
+  },
+  "Stria.Client/Layout/NavMenu.razor": {
+    "mtime": 1794233126.038,
+    "seen": 1794937991.2294002,
+    "ast_hash": "88a71e906fb5d172dce9edc6d27cd60e",
+    "semantic_hash": "88a71e906fb5d172dce9edc6d27cd60e"
+  },
+  "Stria.Client/Layout/ReconnectModal.razor": {
+    "mtime": 1794233126.039,
+    "seen": 1794937991.229401,
+    "ast_hash": "213e887a900b77e059afe212e430d194",
+    "semantic_hash": "213e887a900b77e059afe212e430d194"
+  },
+  "Stria.Client/Layout/ReconnectModal.razor.js": {
+    "mtime": 1794233121.427,
+    "seen": 1794937991.229401,
+    "ast_hash": "38d8a9758570b3cdcb858199d735c19b",
+    "semantic_hash": "38d8a9758570b3cdcb858199d735c19b"
+  },
+  "Stria.Client/Pages/Counter.razor": {
+    "mtime": 1794233126.04,
+    "seen": 1794937991.229402,
+    "ast_hash": "f98de16cce5979294c6a266a298a556c",
+    "semantic_hash": "f98de16cce5979294c6a266a298a556c"
+  },
+  "Stria.Client/Pages/Home.razor": {
+    "mtime": 1794876573.7120023,
+    "seen": 1794937991.229402,
+    "ast_hash": "4c82e40ca7d009bc524553a84be791ef",
+    "semantic_hash": "4c82e40ca7d009bc524553a84be791ef"
+  },
+  "Stria.Client/Pages/NotFound.razor": {
+    "mtime": 1794233121.424,
+    "seen": 1794937991.2294028,
+    "ast_hash": "d416bdb30b4d47e57209672dee783403",
+    "semantic_hash": "d416bdb30b4d47e57209672dee783403"
+  },
+  "Stria.Client/Pages/Weather.razor": {
+    "mtime": 1794233126.042,
+    "seen": 1794937991.2294028,
+    "ast_hash": "5fbcb2412ab399e7049d20bc0d9fa668",
+    "semantic_hash": "5fbcb2412ab399e7049d20bc0d9fa668"
+  },
+  "Stria.Client/Program.cs": {
+    "mtime": 1794881216.2526822,
+    "seen": 1794937991.229404,
+    "ast_hash": "04c14d15ca13fb689632512c3129f9c1",
+    "semantic_hash": "04c14d15ca13fb689632512c3129f9c1"
+  },
+  "Stria.Client/Routes.razor": {
+    "mtime": 1794233126.043,
+    "seen": 1794937991.229405,
+    "ast_hash": "2411897c51849086803242baf395c2d3",
+    "semantic_hash": "2411897c51849086803242baf395c2d3"
+  },
+  "Stria.Client/Stria.Client.csproj": {
+    "mtime": 1794233126.114,
+    "seen": 1794937991.229405,
+    "ast_hash": "11ceae9db08903322fe1be5079035d79",
+    "semantic_hash": "11ceae9db08903322fe1be5079035d79"
+  },
+  "Stria.Client/_Imports.razor": {
+    "mtime": 1794233126.044,
+    "seen": 1794937991.2294059,
+    "ast_hash": "c7bcbf51ea8c164a12e28ff3efe8e44b",
+    "semantic_hash": "c7bcbf51ea8c164a12e28ff3efe8e44b"
+  },
+  "Stria.Client/wwwroot/appsettings.Development.json": {
+    "mtime": 1794233121.428,
+    "seen": 1794937991.2294059,
+    "ast_hash": "477a525a47fc9bdbbf94690e6633d843",
+    "semantic_hash": "477a525a47fc9bdbbf94690e6633d843"
+  },
+  "Stria.Client/wwwroot/appsettings.json": {
+    "mtime": 1794233121.428,
+    "seen": 1794937991.229407,
+    "ast_hash": "477a525a47fc9bdbbf94690e6633d843",
+    "semantic_hash": "477a525a47fc9bdbbf94690e6633d843"
+  },
+  "Stria.SampleService/FaultInjectionMiddleware.cs": {
+    "mtime": 1794881216.252774,
+    "seen": 1794937991.229408,
+    "ast_hash": "6b242846cc0e1bcecb042908420ac24b",
+    "semantic_hash": "6b242846cc0e1bcecb042908420ac24b"
+  },
+  "Stria.SampleService/FaultPoller.cs": {
+    "mtime": 1794881057.4119248,
+    "seen": 1794937991.229408,
+    "ast_hash": "0250bfeda0ca0ae1c796bd248ac83743",
+    "semantic_hash": "0250bfeda0ca0ae1c796bd248ac83743"
+  },
+  "Stria.SampleService/FaultState.cs": {
+    "mtime": 1794881216.2530081,
+    "seen": 1794937991.229409,
+    "ast_hash": "e233cc0bc17587361978481cf979ee6b",
+    "semantic_hash": "e233cc0bc17587361978481cf979ee6b"
+  },
+  "Stria.SampleService/Models.cs": {
+    "mtime": 1794881216.253258,
+    "seen": 1794937991.229409,
+    "ast_hash": "3c3096dbd31c5a94059900bfe4de81d0",
+    "semantic_hash": "3c3096dbd31c5a94059900bfe4de81d0"
+  },
+  "Stria.SampleService/Program.cs": {
+    "mtime": 1794881057.4121528,
+    "seen": 1794937991.22941,
+    "ast_hash": "6e5794660a64e5531f1e6aa40c4b92d3",
+    "semantic_hash": "6e5794660a64e5531f1e6aa40c4b92d3"
+  },
+  "Stria.SampleService/Properties/launchSettings.json": {
+    "mtime": 1794275923.688,
+    "seen": 1794937991.22941,
+    "ast_hash": "93742329c2892bbb7656350e6a1e4c2b",
+    "semantic_hash": "93742329c2892bbb7656350e6a1e4c2b"
+  },
+  "Stria.SampleService/Stria.SampleService.csproj": {
+    "mtime": 1794333480.61,
+    "seen": 1794937991.2294111,
+    "ast_hash": "6740c3f92b059af3a6ccbfc311ef5b28",
+    "semantic_hash": "6740c3f92b059af3a6ccbfc311ef5b28"
+  },
+  "Stria.SampleService/appsettings.Development.json": {
+    "mtime": 1794275923.694,
+    "seen": 1794937991.229412,
+    "ast_hash": "477a525a47fc9bdbbf94690e6633d843",
+    "semantic_hash": "477a525a47fc9bdbbf94690e6633d843"
+  },
+  "Stria.SampleService/appsettings.json": {
+    "mtime": 1794275923.69,
+    "seen": 1794937991.229412,
+    "ast_hash": "732f4d75514e890746f0170256ed9654",
+    "semantic_hash": "732f4d75514e890746f0170256ed9654"
+  },
+  "Stria.Tests/ChaosApiTests.cs": {
+    "mtime": 1794877043.1369672,
+    "seen": 1794937991.229413,
+    "ast_hash": "fbd1555434bf483e8943b1ba4ebff66b",
+    "semantic_hash": "fbd1555434bf483e8943b1ba4ebff66b"
+  },
+  "Stria.Tests/ChaosRulesTests.cs": {
+    "mtime": 1794881216.2535522,
+    "seen": 1794937991.229413,
+    "ast_hash": "abe0cdf41cab11e8dc0b7e68190a8f96",
+    "semantic_hash": "abe0cdf41cab11e8dc0b7e68190a8f96"
+  },
+  "Stria.Tests/DatabaseChaosOrchestratorTests.cs": {
+    "mtime": 1794876082.854545,
+    "seen": 1794937991.229414,
+    "ast_hash": "61b329a37911d780e0628a2d923b6b0b",
+    "semantic_hash": "61b329a37911d780e0628a2d923b6b0b"
+  },
+  "Stria.Tests/MSTestSettings.cs": {
+    "mtime": 1794881216.2537386,
+    "seen": 1794937991.229414,
+    "ast_hash": "82cd161b76a2abfcd6e5294e5c812c72",
+    "semantic_hash": "82cd161b76a2abfcd6e5294e5c812c72"
+  },
+  "Stria.Tests/Stria.Tests.csproj": {
+    "mtime": 1794876713.1880825,
+    "seen": 1794937991.229415,
+    "ast_hash": "5c96a70f175908ac786e8cf1143f6457",
+    "semantic_hash": "5c96a70f175908ac786e8cf1143f6457"
+  },
+  "Stria.Tests/TestSupport/PostgresFixture.cs": {
+    "mtime": 1794876951.7453508,
+    "seen": 1794937991.229415,
+    "ast_hash": "5658d4b90d896cf57ed4fafce51386f4",
+    "semantic_hash": "5658d4b90d896cf57ed4fafce51386f4"
+  },
+  "Stria.Tests/TestSupport/StriaApiFactory.cs": {
+    "mtime": 1794876134.377544,
+    "seen": 1794937991.229416,
+    "ast_hash": "e5d5ca8c94e67e24e624f2b6701c36d7",
+    "semantic_hash": "e5d5ca8c94e67e24e624f2b6701c36d7"
+  },
+  "Stria.sln": {
+    "mtime": 1794876713.1876664,
+    "seen": 1794937991.229416,
+    "ast_hash": "b138b7294a49b38a21e695a78d997db5",
+    "semantic_hash": "b138b7294a49b38a21e695a78d997db5"
+  },
+  "compose.yaml": {
+    "mtime": 1794811875.5886989,
+    "seen": 1794937991.2294168,
+    "ast_hash": "61982ca1dbd07bdf74dc60575c6e6a7d",
+    "semantic_hash": "61982ca1dbd07bdf74dc60575c6e6a7d"
+  },
+  "README.md": {
+    "mtime": 1794881691.3106794,
+    "seen": 1794937991.2294168,
+    "ast_hash": "ef9c897980fe0f25968038f186643b13",
+    "semantic_hash": "ef9c897980fe0f25968038f186643b13"
+  },
+  "docs/PHASE_1_HANDOFF.md": {
+    "mtime": 1794881475.1387737,
+    "seen": 1794937991.229418,
+    "ast_hash": "f819953186a10fe1467a133ef13bb735",
+    "semantic_hash": "f819953186a10fe1467a133ef13bb735"
+  },
+  "docs/PHASE_2_PLAN.md": {
+    "mtime": 1794881691.305067,
+    "seen": 1794937991.229418,
+    "ast_hash": "e7e63bb439d0824f3a93701d068f9bea",
+    "semantic_hash": "e7e63bb439d0824f3a93701d068f9bea"
+  },
+  "docs/STRIA_SERVICE_PLAN.md": {
+    "mtime": 1794610998.2443893,
+    "seen": 1794937991.229419,
+    "ast_hash": "f7bf877784c465734e4c9c4a3d779787",
+    "semantic_hash": "f7bf877784c465734e4c9c4a3d779787"
+  },
+  "docs/STRIA_SYSTEM_ANALYSIS.md": {
+    "mtime": 1794876573.7135487,
+    "seen": 1794937991.229419,
+    "ast_hash": "d253c5ad5385cb723098222db267f9d4",
+    "semantic_hash": "d253c5ad5385cb723098222db267f9d4"
+  },
+  "Stria.API/wwwroot/favicon.png": {
+    "mtime": 1794233120.815617,
+    "seen": 1794937991.22942,
+    "ast_hash": "eab4f24ab5ff80be586dcdab8e87dc9c",
+    "semantic_hash": "eab4f24ab5ff80be586dcdab8e87dc9c"
+  }
+}
