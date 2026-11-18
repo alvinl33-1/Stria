@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Npgsql;
 using Stria.Client.Security;
@@ -110,6 +111,16 @@ builder.Services.Configure<OpenIdConnectOptions>(OpenIdConnectDefaults.Authentic
         ctx.HandleResponse();
         return Task.CompletedTask;
     };
+});
+
+// Microsoft.Identity.Web installs its own JsonWebTokenHandler, and the MapInboundClaims setter
+// above only reaches the framework's default handlers. Turn mapping off on the handler that
+// actually validates the ID token; otherwise Entra's "roles" claim is renamed to ClaimTypes.Role,
+// RoleClaimType "roles" never matches, and every signed-in user is denied.
+builder.Services.PostConfigure<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme, options =>
+{
+    if (options.TokenHandler is JsonWebTokenHandler handler)
+        handler.MapInboundClaims = false;
 });
 
 builder.Services.Configure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
