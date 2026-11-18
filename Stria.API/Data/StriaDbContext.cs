@@ -53,6 +53,8 @@ public class StriaDbContext : DbContext
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16).IsRequired();
             e.Property(x => x.TriggeredBy).IsRequired().HasMaxLength(ChaosRules.MaxTriggeredByLength);
             e.Property(x => x.ClearedBy).HasMaxLength(ChaosRules.MaxTriggeredByLength);
+            e.Property(x => x.TriggeredByName).HasMaxLength(Actor.MaxDisplayNameLength);
+            e.Property(x => x.ClearedByName).HasMaxLength(Actor.MaxDisplayNameLength);
             e.Property(x => x.CreatedAt).HasColumnType("timestamp with time zone");
             e.Property(x => x.ExpiresAt).HasColumnType("timestamp with time zone").IsRequired();
             e.Property(x => x.ClearedAt).HasColumnType("timestamp with time zone");

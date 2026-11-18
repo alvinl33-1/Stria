@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Stria.Client.Security;
 using Stria.Domain;
 using Stria.DTOs;
 using Stria.Tests.TestSupport;
@@ -41,6 +42,9 @@ public sealed class ChaosApiTests
         {
             AllowAutoRedirect = false
         });
+        // These tests cover the API contract, so they call it as an operator automation client.
+        _client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", TestTokens.Create(ChaosRoles.Operator));
         _ready = true;
     }
 
@@ -96,7 +100,8 @@ public sealed class ChaosApiTests
         Assert.AreEqual("Latency", faults[0].FaultType);
         Assert.AreEqual(250, faults[0].LatencyMs);
         Assert.AreEqual(40, faults[0].Percent);
-        Assert.AreEqual("anonymous", faults[0].TriggeredBy);
+        Assert.AreEqual(TestTokens.DefaultObjectId, faults[0].TriggeredBy);
+        Assert.AreEqual(TestTokens.DisplayName, faults[0].TriggeredByName);
     }
 
     [TestMethod]

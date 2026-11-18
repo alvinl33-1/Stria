@@ -14,6 +14,13 @@ services:
       Retention__MaxAgeDays: "90"
       Retention__MaxClearedExperiments: "10000"
       DataProtection__KeysPath: "/var/lib/stria/dpkeys"
+      # Entra test tenant. Values come from .env (gitignored); Compose runs as Production, so
+      # the host refuses to start without them.
+      AzureAd__TenantId: "${STRIA_TENANT_ID:?set STRIA_TENANT_ID}"
+      AzureAd__ClientId: "${STRIA_CLIENT_ID:?set STRIA_CLIENT_ID}"
+      AzureAd__ClientSecret: "${STRIA_CLIENT_SECRET:?set STRIA_CLIENT_SECRET}"
+      AzureAdApi__TenantId: "${STRIA_TENANT_ID}"
+      AzureAdApi__ClientId: "${STRIA_CLIENT_ID}"
     depends_on:
       db:
         condition: service_healthy

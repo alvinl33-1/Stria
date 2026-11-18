@@ -1,6 +1,8 @@
 @using System.Net.Http.Json
 @implements IAsyncDisposable
 @inject HttpClient Http
+@inject ChaosApiClient Api
+@inject ILogger<ActiveFaultsTable> Logger
 
 <section aria-live="polite">
     <h3 class="fault-list-title">Current incidents</h3>
@@ -36,7 +38,9 @@
                         <th scope="col">Target service</th>
                         <th scope="col">Fault type</th>
                         <th scope="col">Latency</th>
-                        <th scope="col">Action</th>
+                        <AuthorizeView Policy="@ChaosPolicies.Operate">
+                            <th scope="col">Action</th>
+                        </AuthorizeView>
                     </tr>
                 </thead>
                 <tbody>
@@ -46,13 +50,15 @@
                             <td>@fault.TargetService</td>
                             <td>@fault.FaultType</td>
                             <td>@(fault.LatencyMs is int latency ? $"{latency} ms" : "—")</td>
-                            <td>
-                                <button class="fault-clear-button"
-                                        disabled="@_clearing.Contains(fault.TargetService)"
-                                        @onclick="() => ClearFault(fault.TargetService)">
-                                    @(_clearing.Contains(fault.TargetService) ? "Clearing…" : "Clear")
-                                </button>
-                            </td>
+                            <AuthorizeView Policy="@ChaosPolicies.Operate">
+                                <td>
+                                    <button class="fault-clear-button"
+                                            disabled="@_clearing.Contains(fault.TargetService)"
+                                            @onclick="() => ClearFault(fault.TargetService)">
+                                        @(_clearing.Contains(fault.TargetService) ? "Clearing…" : "Clear")
+                                    </button>
+                                </td>
+                            </AuthorizeView>
                         </tr>
                     }
                 </tbody>
@@ -69,12 +75,15 @@
     private Task? _pollTask;
 
     private sealed record ChaosFault(string TargetService, string FaultType, int? LatencyMs);
-    private sealed record FaultInjectionRequest(string TargetService, string FaultType, int? LatencyMs = null, string TriggeredBy = "ManualDashboard");
+    private sealed record FaultInjectionRequest(string TargetService, string FaultType);
     private static readonly string[] TargetServices = ["PaymentGateway", "AuthService", "InventoryAPI"];
 
-    protected override void OnInitialized()
+    // Start polling only once the component is interactive in the browser. OnInitialized also
+    // runs during server prerendering, where the HttpClient has no user cookie and would get 401.
+    protected override void OnAfterRender(bool firstRender)
     {
-        _pollTask = PollFaults();
+        if (firstRender)
+            _pollTask = PollFaults();
     }
 
     private async Task PollFaults()
@@ -106,10 +115,17 @@
         {
             return;
         }
+        catch (HttpRequestException ex)
+        {
+            Logger.LogWarning(ex, "Loading active faults failed.");
+            _faults = null;
+            _message = OperatorMessages.For(ex.StatusCode, "load active faults");
+        }
         catch (Exception ex)
         {
+            Logger.LogWarning(ex, "Loading active faults failed.");
             _faults = null;
-            _message = $"Could not load active faults: {ex.Message}";
+            _message = OperatorMessages.For(null, "load active faults");
         }
 
         await InvokeAsync(StateHasChanged);
@@ -123,12 +139,12 @@
         try
         {
             var request = new FaultInjectionRequest(targetService, "None");
-            using var response = await Http.PostAsJsonAsync("/api/v1/chaos/inject", request, _pollCancellation.Token);
+            using var response = await Api.PostAsJsonAsync("/api/v1/chaos/inject", request, _pollCancellation.Token);
             if (response.IsSuccessStatusCode)
                 await RefreshFaults();
             else
             {
-                _message = $"Could not clear {targetService}: server returned {response.StatusCode}.";
+                _message = OperatorMessages.For(response.StatusCode, $"clear {targetService}");
                 await InvokeAsync(StateHasChanged);
             }
         }
@@ -138,7 +154,8 @@
         }
         catch (Exception ex)
         {
-            _message = $"Could not clear {targetService}: {ex.Message}";
+            Logger.LogWarning(ex, "Clearing {Service} failed.", targetService);
+            _message = OperatorMessages.For((ex as HttpRequestException)?.StatusCode, $"clear {targetService}");
             await InvokeAsync(StateHasChanged);
         }
         finally

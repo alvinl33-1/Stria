@@ -35,16 +35,20 @@ public class DatabaseChaosOrchestrator : IChaosOrchestrator
 
     public async Task InjectFaultAsync(
         FaultInjectionRequest request,
-        string triggeredBy,
+        Actor actor,
         CancellationToken cancellationToken = default)
     {
         // Re-check invariants here too: the API boundary is not the only possible caller.
         if (!ChaosRules.TryValidate(request, out var fault, out var error))
             throw new ArgumentException(error, nameof(request));
 
-        var actor = triggeredBy?.Trim();
-        if (string.IsNullOrEmpty(actor) || actor.Length > ChaosRules.MaxTriggeredByLength)
-            throw new ArgumentException("Invalid actor identity.", nameof(triggeredBy));
+        ArgumentNullException.ThrowIfNull(actor);
+        var actorId = actor.Id?.Trim();
+        if (string.IsNullOrEmpty(actorId) || actorId.Length > ChaosRules.MaxTriggeredByLength)
+            throw new ArgumentException("Invalid actor identity.", nameof(actor));
+        if (actor.DisplayName is { Length: > Actor.MaxDisplayNameLength })
+            throw new ArgumentException("Actor display name is too long.", nameof(actor));
+        actor = actor with { Id = actorId };
 
         for (var attempt = 1; ; attempt++)
         {
@@ -107,7 +111,7 @@ public class DatabaseChaosOrchestrator : IChaosOrchestrator
         return count;
     }
 
-    private async Task ApplyAsync(ValidatedFault fault, string actor, CancellationToken ct)
+    private async Task ApplyAsync(ValidatedFault fault, Actor actor, CancellationToken ct)
     {
         var target = fault.TargetService;
         DateTime now = _time.GetUtcNow().UtcDateTime;
@@ -125,7 +129,8 @@ public class DatabaseChaosOrchestrator : IChaosOrchestrator
             .ExecuteUpdateAsync(s => s
                 .SetProperty(e => e.Status, ExperimentStatus.Cleared)
                 .SetProperty(e => e.ClearedAt, clearedAt)
-                .SetProperty(e => e.ClearedBy, actor), ct);
+                .SetProperty(e => e.ClearedBy, actor.Id)
+                .SetProperty(e => e.ClearedByName, actor.DisplayName), ct);
 
         // 3. "None" only clears; every other fault type opens a new Active row with a lease.
         if (fault.FaultType != ChaosRules.NoFault)
@@ -138,7 +143,8 @@ public class DatabaseChaosOrchestrator : IChaosOrchestrator
                 Percent = fault.Percent,
                 StatusCode = fault.StatusCode,
                 Status = ExperimentStatus.Active,
-                TriggeredBy = actor,
+                TriggeredBy = actor.Id,
+                TriggeredByName = actor.DisplayName,
                 CreatedAt = now,
                 ExpiresAt = now + fault.Duration
             });
@@ -149,7 +155,7 @@ public class DatabaseChaosOrchestrator : IChaosOrchestrator
 
         _logger.LogInformation(
             "{FaultType} on {Service} applied by {Actor} for {Duration}; {Cleared} previous experiment(s) cleared.",
-            fault.FaultType, target, actor, fault.Duration, cleared);
+            fault.FaultType, target, actor.Id, fault.Duration, cleared);
     }
 
     /// <summary>
