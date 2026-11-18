@@ -11,19 +11,22 @@ Stria recognizes three target names: `PaymentGateway`, `AuthService`, and `Inven
 - `CpuSpike`: records an experiment, but the sample service does not execute this fault.
 - `None`: clears the active fault for the target.
 
-Experiments have a lease from 1 to 3,600 seconds, defaulting to 300 seconds. Requests that omit the percentage use 100%; `HttpFailure` defaults to status 503. The server records the initiating identity as `anonymous` until authentication is configured; a caller-supplied `TriggeredBy` value is ignored.
+Experiments have a lease from 1 to 3,600 seconds, defaulting to 300 seconds. Requests that omit the percentage use 100%; `HttpFailure` defaults to status 503. The server records the initiating identity from the caller's validated Entra claims (object ID, plus display name); a caller-supplied `TriggeredBy` value is ignored.
 
 The dashboard is served by the Stria ASP.NET Core host with interactive Blazor components. PostgreSQL stores experiment state. The `sample-payment-gateway` container polls Stria for `PaymentGateway` directives and applies latency or HTTP failure faults to its `/work` endpoint. Its `/healthz` endpoint remains available while faults are active. The database is only exposed on the internal Compose network; the sample service port is bound to loopback.
 
 ## Run with Docker Compose
 
-Create a `.env` file beside `compose.yaml` containing a local database password:
+Create a `.env` file beside `compose.yaml` (start from `.env.example`) containing a local database password and the Entra test-tenant settings described in [docs/ENTRA_SETUP.md](docs/ENTRA_SETUP.md):
 
 ```dotenv
 STRIA_DB_PASSWORD=replace-with-a-strong-local-password
+STRIA_TENANT_ID=<tenant-id>
+STRIA_CLIENT_ID=<client-id>
+STRIA_CLIENT_SECRET=<client-secret>
 ```
 
-The `.env` file is used by Compose to configure PostgreSQL and Stria's connection string. Then, from the repository root, run:
+The `.env` file is gitignored and is used by Compose to configure PostgreSQL, Stria's connection string and sign-in. Compose runs Stria in the Production environment, so it refuses to start when an identity setting is missing. Then, from the repository root, run:
 
 ```sh
 docker compose up --build
@@ -70,13 +73,27 @@ Configure `main` branch protection to require `build-and-test`, `dependency-audi
 
 The Phase 2 security plan is in [docs/PHASE_2_PLAN.md](docs/PHASE_2_PLAN.md).
 
+## Authentication
+
+Operators sign in with Microsoft Entra ID (OpenID Connect, authorization-code flow); see [docs/ENTRA_SETUP.md](docs/ENTRA_SETUP.md) for the test-tenant setup. Access is controlled by Entra app roles:
+
+| Role | Can |
+|---|---|
+| `ChaosViewer` | View active faults |
+| `ChaosOperator` | View, inject and clear faults |
+| `ChaosAdmin` | Everything an operator can (admin-only features arrive in Phase 2 Step 5) |
+
+Control-plane routes accept the browser session cookie or an Entra bearer token. Unauthenticated API calls get `401`, missing roles `403`. Cookie-authenticated `POST`s must send an antiforgery token in the `X-XSRF-TOKEN` header (from `GET /api/v1/antiforgery/token`); bearer callers are exempt. Request bodies on `/api/v1/chaos` are capped at 16 KB (`413`), and reads and mutations are rate limited per user (`429` with `Retry-After`). `/healthz`, `/readyz` and, until Phase 2 Step 4, `/api/v1/chaos/directives/{service}` are anonymous.
+
 ## HTTP API
 
-`GET /api/v1/chaos/faults` returns active, unexpired experiments.
+`GET /api/v1/me` returns the caller's object ID and display name (any signed-in caller).
+
+`GET /api/v1/chaos/faults` returns active, unexpired experiments (`ChaosViewer` or higher).
 
 `GET /api/v1/chaos/directives/{service}` returns the directive for a registered service, or `204 No Content` when it has no active fault. An unknown target returns a `404` problem detail.
 
-`POST /api/v1/chaos/inject` creates or replaces a target's active experiment. Send JSON such as:
+`POST /api/v1/chaos/inject` creates or replaces a target's active experiment (`ChaosOperator` or `ChaosAdmin`). Send JSON such as:
 
 ```json
 {
