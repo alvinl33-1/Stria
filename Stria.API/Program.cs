@@ -179,13 +179,12 @@ else
     app.UseHsts();
 }
 
-// Data-plane services poll /api/v1/chaos/directives over the private Compose network on the
-// plain-HTTP listener (8080, not published to the host). Without this exemption the HTTPS
-// redirect would bounce them to a port whose dev certificate they don't trust.
+// Data-plane services poll /api/v1/chaos/directives on the plain-HTTP listener (8080; Compose
+// publishes it to the host on loopback only). Their keys cross this hop unencrypted, which is
+// acceptable on the local Compose network only; Phase 3 terminates TLS at the ingress.
 app.UseWhen(
     ctx => !ctx.Request.Path.StartsWithSegments("/api/v1/chaos/directives"),
     branch => branch.UseHttpsRedirection());
-app.UseStaticFiles();
 app.UseChaosBodyLimit();
 app.UseSecurityHeaders();
 app.UseAuthentication();
@@ -317,6 +316,11 @@ api.MapPost("/chaos/inject", async (
     .AddEndpointFilter<CookieAntiforgeryFilter>();
 
 // 4. MAP ROOT UI PATHS
+// Static assets are endpoints in .NET 10: MapStaticAssets serves _framework/blazor.web.js and the
+// fingerprinted paths that @Assets[...] resolves (UseStaticFiles does neither). AllowAnonymous
+// keeps the fallback sign-in policy off CSS/JS, so pages such as /access-denied still load.
+app.MapStaticAssets().AllowAnonymous();
+
 app.MapRazorComponents<App>()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(Stria.Client._Imports).Assembly);

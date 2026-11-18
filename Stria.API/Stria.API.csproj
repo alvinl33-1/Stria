@@ -8,6 +8,10 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+        <!-- The SDK infers this from .razor files, but the Dockerfile restores with only the
+             .csproj files copied. Without it, that restore skips the package that provides
+             _framework/blazor.web.js and the published dashboard never becomes interactive. -->
+        <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
       <UserSecretsId>4504e9cb-5a51-47a8-bb83-f461761d00f5</UserSecretsId>
   </PropertyGroup>
 
