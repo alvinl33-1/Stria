@@ -61,6 +61,10 @@ if (!builder.Environment.IsDevelopment())
     if (missing.Length > 0)
         throw new InvalidOperationException(
             $"Identity settings missing: {string.Join(", ", missing)}. Use user-secrets or environment variables.");
+
+    if (!builder.Configuration.GetSection("DataPlane:ServiceKeyHashes").GetChildren().Any())
+        throw new InvalidOperationException(
+            "DataPlane:ServiceKeyHashes has no entries, so no service could read its directives.");
 }
 
 builder.Services.AddDbContextFactory<StriaDbContext>(options => options.UseNpgsql(connectionString));
@@ -92,6 +96,17 @@ builder.Services.AddAuthentication(options =>
     .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"));
 builder.Services.AddAuthentication()
     .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAdApi"), JwtBearerDefaults.AuthenticationScheme);
+
+// Data plane: polling services authenticate with their own key, never an operator credential.
+builder.Services.AddOptions<DataPlaneOptions>()
+    .Bind(builder.Configuration.GetSection(DataPlaneOptions.SectionName))
+    .Validate(DataPlaneKeys.IsValid,
+        "DataPlane:ServiceKeyHashes entries must name a registered service and hold a 64-character hex SHA-256.")
+    .ValidateOnStart();
+builder.Services.AddAuthentication()
+    .AddScheme<AuthenticationSchemeOptions, DataPlaneAuthenticationHandler>(
+        DataPlaneDefaults.AuthenticationScheme, configureOptions: null);
+builder.Services.AddSingleton<IAuthorizationHandler, OwnDirectiveHandler>();
 
 builder.Services.Configure<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme, options =>
 {
@@ -152,6 +167,10 @@ builder.Services.AddAuthorization(options =>
     // Secure by default: an endpoint without its own authorization metadata still requires a
     // signed-in user. Public endpoints opt out explicitly with AllowAnonymous().
     options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
+    options.AddPolicy(DataPlaneDefaults.Policy, policy => policy
+        .AddAuthenticationSchemes(DataPlaneDefaults.AuthenticationScheme)
+        .RequireAuthenticatedUser()
+        .AddRequirements(new OwnDirectiveRequirement()));
 });
 
 // Cookie-authenticated JSON mutations send the antiforgery token in this header.
@@ -179,13 +198,12 @@ else
     app.UseHsts();
 }
 
-// Data-plane services poll /api/v1/chaos/directives over the private Compose network on the
-// plain-HTTP listener (8080, not published to the host). Without this exemption the HTTPS
-// redirect would bounce them to a port whose dev certificate they don't trust.
+// Data-plane services poll /api/v1/chaos/directives on the plain-HTTP listener (8080; Compose
+// publishes it to the host on loopback only). Their keys cross this hop unencrypted, which is
+// acceptable on the local Compose network only; Phase 3 terminates TLS at the ingress.
 app.UseWhen(
     ctx => !ctx.Request.Path.StartsWithSegments("/api/v1/chaos/directives"),
     branch => branch.UseHttpsRedirection());
-app.UseStaticFiles();
 app.UseChaosBodyLimit();
 app.UseSecurityHeaders();
 app.UseAuthentication();
@@ -254,7 +272,7 @@ api.MapGet("/chaos/faults", async (IChaosOrchestrator orchestrator, Cancellation
 //   200 + FaultDirective  -> apply it for RemainingSeconds
 //   204                   -> no active fault
 //   404                   -> not a registered service
-// Anonymous until Phase 2 Step 4 adds the data-plane credential.
+// Requires the calling service's own data-plane key: no key -> 401, another service's key -> 403.
 api.MapGet("/chaos/directives/{service}", async (
     string service,
     IChaosOrchestrator orchestrator,
@@ -284,7 +302,9 @@ api.MapGet("/chaos/directives/{service}", async (
         experiment.Percent,
         experiment.StatusCode,
         remaining));
-}).AllowAnonymous();
+})
+    .RequireAuthorization(DataPlaneDefaults.Policy)
+    .RequireRateLimiting(HttpHardening.DataPlanePolicy);
 
 api.MapPost("/chaos/inject", async (
         FaultInjectionRequest request,
@@ -317,6 +337,11 @@ api.MapPost("/chaos/inject", async (
     .AddEndpointFilter<CookieAntiforgeryFilter>();
 
 // 4. MAP ROOT UI PATHS
+// Static assets are endpoints in .NET 10: MapStaticAssets serves _framework/blazor.web.js and the
+// fingerprinted paths that @Assets[...] resolves (UseStaticFiles does neither). AllowAnonymous
+// keeps the fallback sign-in policy off CSS/JS, so pages such as /access-denied still load.
+app.MapStaticAssets().AllowAnonymous();
+
 app.MapRazorComponents<App>()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(Stria.Client._Imports).Assembly);

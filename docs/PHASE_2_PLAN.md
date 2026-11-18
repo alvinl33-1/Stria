@@ -1,6 +1,7 @@
 # Stria Phase 2 Plan — Authorized Control Plane
 
-**Status:** In progress. Steps 0–3 are implemented locally (Step 0 awaits its first GitHub Actions run). Step 4 (data-plane credential) is next.
+**Status:** In progress. Steps 0–4 are implemented and merged. Step 5 (admin kill switch) is next;
+see [PHASE_2_HANDOFF.md](PHASE_2_HANDOFF.md) for current state and where to start.
 
 **Scope guard:** Phase 2 is a security/identity phase. Do not provision Azure resources or
 incur subscription cost. Use a test Entra tenant or a local OIDC provider for development
@@ -207,6 +208,13 @@ or a broken Dockerfile fails the pipeline. The auth tests added in later steps p
 **Acceptance:** an unauthenticated request is challenged; a valid test token creates an
 authenticated principal; no secret is committed.
 
+**Lesson from manual testing:** Microsoft.Identity.Web replaces the OIDC token handler, so
+`OpenIdConnectOptions.MapInboundClaims = false` did not reach it and Entra's `roles` claim was
+renamed, denying every browser user. The integration tests use a test cookie and missed it.
+`ClaimMappingTests` now validates an Entra-shaped token with each scheme's fully configured
+handler; any new token-based scheme gets the same test. (Step 4's data-plane scheme builds its
+own claims, so there is nothing to rename and it needs no case.)
+
 ### Step 2 — Route authorization and trusted actors (implemented)
 
 - Apply `Chaos.View`, `Chaos.Operate`, and `Chaos.Admin` policies to the API route groups.
@@ -228,7 +236,7 @@ authenticated principal; no secret is committed.
 **Acceptance:** cookie-authenticated mutations cannot be forged cross-site, and abuse limits are
 observable and tested.
 
-### Step 4 — Data-plane credential separation
+### Step 4 — Data-plane credential separation (implemented)
 
 - Add a dedicated data-plane authentication scheme and per-service credentials.
 - Bind the credential to the requested service name; reject cross-service reads.
@@ -237,6 +245,15 @@ observable and tested.
 
 **Acceptance:** control-plane credentials cannot read directives; a service cannot read another
 service's directive; the sample service still applies latency and HTTP failures.
+
+**As built:** per-service hashed keys (section 3.4's local option). Services send
+`X-Stria-Service-Key`; Stria stores only SHA-256 hashes in `DataPlane:ServiceKeyHashes` and
+compares in constant time. The `DataPlane` scheme issues a `stria:service` claim, and the
+`DataPlane.OwnDirective` policy requires it to match the route's `{service}`. Polling has its own
+per-service rate limit. Startup fails on malformed entries, and outside Development when no key
+is configured. Plain SHA-256 is enough because keys are 32 random bytes. Phase 3 can replace the
+scheme with Entra workload identity without changing the route. `DataPlaneSecurityTests` covers
+the data-plane rows of the test matrix.
 
 ### Step 5 — Admin kill switch
 
@@ -261,12 +278,16 @@ credential can engage or release the switch.
 | Caller | `GET /faults` | `POST /inject` | `GET /directives/{service}` | Kill switch |
 |---|---|---|---|---|
 | Anonymous | `401` | `401` | `401` | `401` |
-| `ChaosViewer` | `200` | `403` | `403` | `403` |
-| `ChaosOperator` | `200` | `202` | `403` | `403` |
-| `ChaosAdmin` | `200` | `202` | `403` | `202`/`200` |
-| Data plane for its own service | `403` | `403` | `200`/`204` | `403` |
-| Data plane for another service | `403` | `403` | `403` | `403` |
+| `ChaosViewer` | `200` | `403` | `401` | `403` |
+| `ChaosOperator` | `200` | `202` | `401` | `403` |
+| `ChaosAdmin` | `200` | `202` | `401` | `202`/`200` |
+| Data plane for its own service | `401` | `401` | `200`/`204` | `401` |
+| Data plane for another service | `401` | `401` | `403` | `401` |
 | Expired/wrong-audience JWT | `401` | `401` | `401` | `401` |
+
+Cross-credential cells are `401`, not `403`: each route checks only its own credential type, so
+an operator credential on the directive route, or a data-plane key on a control-plane route, is
+treated as no credential at all.
 
 Add separate cases for rate limits (`429`), oversized bodies (`413`), missing antiforgery tokens
 (`400`), and kill-switch suppression (`409`).
@@ -280,16 +301,17 @@ Add separate cases for rate limits (`429`), oversized bodies (`413`), missing an
 | Testcontainers plus auth can make tests slow/flaky | Reuse one container per class, use a signed test token issuer, keep auth tests in the existing integration job |
 | Data-plane credentials could be confused with operator tokens | Separate schemes, audiences, and policies; add cross-credential negative tests |
 | Migrations add risk to a live schema | Forward-only EF migration; test on PostgreSQL in CI; keep startup migration for local Compose only |
-| `CpuSpike` remains visible but unexecutable | Do not expand it in Phase 2; remove/hide it in Phase 5 |
+| `CpuSpike` is accepted by the API but unexecutable | Hidden from the dashboard in Step 3; do not expand it in Phase 2; remove it in Phase 5 |
+| Test auth handlers can hide real claim-mapping bugs | `ClaimMappingTests` run each real scheme's configured token handler; add a case for every new token-based scheme |
 | No Azure spend in Phase 2 | Test tenant/local OIDC only; Phase 3 infra requires explicit authorization |
 
 ## 7. Definition of done
 
-- [ ] CI fails on formatting, build warnings, vulnerable packages, or broken images.
-- [ ] Anonymous control-plane and directive requests are rejected.
+- [x] CI fails on formatting, build warnings, vulnerable packages, or broken images.
+- [x] Anonymous control-plane and directive requests are rejected.
 - [ ] Viewers cannot mutate; operators cannot administer the kill switch.
 - [x] Actor IDs come from validated claims and are covered by tests.
-- [ ] Data-plane credentials are service-scoped and cannot be used on control routes.
+- [x] Data-plane credentials are service-scoped and cannot be used on control routes.
 - [x] Rate limits, request-size limits, and CSRF protection are tested.
 - [ ] Kill switch clears and suppresses faults, with audit history.
 - [ ] README and handoff document the auth setup, required CI checks, and Phase 2 evidence.

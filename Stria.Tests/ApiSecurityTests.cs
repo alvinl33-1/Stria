@@ -126,14 +126,6 @@ public sealed class ApiSecurityTests
     }
 
     [TestMethod]
-    public async Task Directives_StayAnonymous_UntilDataPlaneAuth()
-    {
-        using var client = BearerClient(Anonymous);
-        var response = await client.GetAsync("/api/v1/chaos/directives/PaymentGateway");
-        Assert.AreEqual(HttpStatusCode.NoContent, response.StatusCode);
-    }
-
-    [TestMethod]
     public async Task Health_IsAnonymous()
     {
         using var client = BearerClient(Anonymous);

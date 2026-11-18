@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Stria.Security;
 
 namespace Stria.Tests.TestSupport;
 
@@ -51,6 +52,9 @@ public sealed class StriaApiFactory : WebApplicationFactory<Program>
         // High limits so ordinary tests never hit 429; the rate-limit tests override these.
         builder.UseSetting("RateLimits:ReadPermitLimit", "10000");
         builder.UseSetting("RateLimits:MutatePermitLimit", "10000");
+
+        builder.UseSetting("DataPlane:ServiceKeyHashes:PaymentGateway", DataPlaneKeys.HashHex(TestDataPlaneKeys.PaymentGateway));
+        builder.UseSetting("DataPlane:ServiceKeyHashes:AuthService", DataPlaneKeys.HashHex(TestDataPlaneKeys.AuthService));
 
         foreach (var (key, value) in _overrides)
             builder.UseSetting(key, value);

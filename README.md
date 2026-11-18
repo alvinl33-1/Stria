@@ -13,20 +13,30 @@ Stria recognizes three target names: `PaymentGateway`, `AuthService`, and `Inven
 
 Experiments have a lease from 1 to 3,600 seconds, defaulting to 300 seconds. Requests that omit the percentage use 100%; `HttpFailure` defaults to status 503. The server records the initiating identity from the caller's validated Entra claims (object ID, plus display name); a caller-supplied `TriggeredBy` value is ignored.
 
-The dashboard is served by the Stria ASP.NET Core host with interactive Blazor components. PostgreSQL stores experiment state. The `sample-payment-gateway` container polls Stria for `PaymentGateway` directives and applies latency or HTTP failure faults to its `/work` endpoint. Its `/healthz` endpoint remains available while faults are active. The database is only exposed on the internal Compose network; the sample service port is bound to loopback.
+The dashboard is served by the Stria ASP.NET Core host with interactive Blazor components. PostgreSQL stores experiment state. The `sample-payment-gateway` container polls Stria for `PaymentGateway` directives, authenticating with its own data-plane key, and applies latency or HTTP failure faults to its `/work` endpoint. Its `/healthz` endpoint remains available while faults are active. The database is only exposed on the internal Compose network; the sample service port is bound to loopback.
 
 ## Run with Docker Compose
 
-Create a `.env` file beside `compose.yaml` (start from `.env.example`) containing a local database password and the Entra test-tenant settings described in [docs/ENTRA_SETUP.md](docs/ENTRA_SETUP.md):
+Create a `.env` file beside `compose.yaml` (start from `.env.example`) containing a local database password, the Entra test-tenant settings described in [docs/ENTRA_SETUP.md](docs/ENTRA_SETUP.md), and the sample service's data-plane key:
 
 ```dotenv
 STRIA_DB_PASSWORD=replace-with-a-strong-local-password
 STRIA_TENANT_ID=<tenant-id>
 STRIA_CLIENT_ID=<client-id>
 STRIA_CLIENT_SECRET=<client-secret>
+STRIA_PAYMENTGATEWAY_KEY=<key>
+STRIA_PAYMENTGATEWAY_KEY_SHA256=<sha256-hex-of-key>
 ```
 
-The `.env` file is gitignored and is used by Compose to configure PostgreSQL, Stria's connection string and sign-in. Compose runs Stria in the Production environment, so it refuses to start when an identity setting is missing. Then, from the repository root, run:
+Generate the key and its hash once:
+
+```sh
+KEY=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')
+echo "STRIA_PAYMENTGATEWAY_KEY=$KEY"
+echo "STRIA_PAYMENTGATEWAY_KEY_SHA256=$(printf %s "$KEY" | shasum -a 256 | cut -d' ' -f1)"
+```
+
+The `.env` file is gitignored and is used by Compose to configure PostgreSQL, Stria's connection string, sign-in and data-plane keys. Stria receives only the key's hash; the sample service receives the key. Compose runs Stria in the Production environment, so it refuses to start when an identity setting is missing or no data-plane key hash is configured. Then, from the repository root, run:
 
 ```sh
 docker compose up --build
@@ -71,7 +81,7 @@ dotnet test Stria.sln --configuration Release --no-build
 
 Configure `main` branch protection to require `build-and-test`, `dependency-audit`, and `container-build`. The `dependency-review` job starts running when the repository is public; private repositories need GitHub Advanced Security for it, so do not require it while the repository is private. Administrators can bypass these rules; do not use that bypass for normal changes.
 
-The Phase 2 security plan is in [docs/PHASE_2_PLAN.md](docs/PHASE_2_PLAN.md).
+The Phase 2 security plan is in [docs/PHASE_2_PLAN.md](docs/PHASE_2_PLAN.md); current progress and next steps are in [docs/PHASE_2_HANDOFF.md](docs/PHASE_2_HANDOFF.md).
 
 ## Authentication
 
@@ -83,7 +93,13 @@ Operators sign in with Microsoft Entra ID (OpenID Connect, authorization-code fl
 | `ChaosOperator` | View, inject and clear faults |
 | `ChaosAdmin` | Everything an operator can (admin-only features arrive in Phase 2 Step 5) |
 
-Control-plane routes accept the browser session cookie or an Entra bearer token. Unauthenticated API calls get `401`, missing roles `403`. Cookie-authenticated `POST`s must send an antiforgery token in the `X-XSRF-TOKEN` header (from `GET /api/v1/antiforgery/token`); bearer callers are exempt. Request bodies on `/api/v1/chaos` are capped at 16 KB (`413`), and reads and mutations are rate limited per user (`429` with `Retry-After`). `/healthz`, `/readyz` and, until Phase 2 Step 4, `/api/v1/chaos/directives/{service}` are anonymous.
+Control-plane routes accept the browser session cookie or an Entra bearer token. Unauthenticated API calls get `401`, missing roles `403`. Cookie-authenticated `POST`s must send an antiforgery token in the `X-XSRF-TOKEN` header (from `GET /api/v1/antiforgery/token`); bearer callers are exempt. Request bodies on `/api/v1/chaos` are capped at 16 KB (`413`), and reads and mutations are rate limited per user (`429` with `Retry-After`). Only `/healthz` and `/readyz` are anonymous.
+
+### Data-plane keys
+
+Services that poll for directives use a separate credential: a per-service key sent in the `X-Stria-Service-Key` header. Stria stores only each key's SHA-256 (`DataPlane:ServiceKeyHashes:<ServiceName>`) and compares in constant time. A key authorizes reading only its own service's directive: no or an unknown key gets `401`, another service's directive `403`. Each route checks only its own credential type, so operator cookies and bearer tokens get `401` on the directive route, and a data-plane key gets `401` on control-plane routes. Polling is rate limited per service (`RateLimits:DataPlanePermitLimit`, default 240 per minute).
+
+Keys cross the plain-HTTP Compose network unencrypted, which is acceptable only for local use; deployed environments need TLS and a secret store for the keys.
 
 ## HTTP API
 
@@ -91,7 +107,7 @@ Control-plane routes accept the browser session cookie or an Entra bearer token.
 
 `GET /api/v1/chaos/faults` returns active, unexpired experiments (`ChaosViewer` or higher).
 
-`GET /api/v1/chaos/directives/{service}` returns the directive for a registered service, or `204 No Content` when it has no active fault. An unknown target returns a `404` problem detail.
+`GET /api/v1/chaos/directives/{service}` returns the directive for the calling service, or `204 No Content` when it has no active fault (requires that service's data-plane key; see [Data-plane keys](#data-plane-keys)). Asking for any other target, including an unregistered one, returns `403`.
 
 `POST /api/v1/chaos/inject` creates or replaces a target's active experiment (`ChaosOperator` or `ChaosAdmin`). Send JSON such as:
 
@@ -109,6 +125,6 @@ For an HTTP failure, use `"faultType": "HttpFailure"` and optionally set `"statu
 
 ## Sample service configuration
 
-The sample service reads `Stria:BaseUrl`, `Stria:ServiceName`, `Stria:PollIntervalMs`, and `Stria:MaxConcurrentDelayed` from configuration. In Compose these are provided as environment variables. It polls once per second by default, keeps an existing fault lease when Stria is temporarily unreachable, and lets that lease expire locally rather than extending it.
+The sample service reads `Stria:BaseUrl`, `Stria:ServiceName`, `Stria:ServiceKey`, `Stria:PollIntervalMs`, and `Stria:MaxConcurrentDelayed` from configuration; it refuses to start without a service key. In Compose these are provided as environment variables. It polls once per second by default, keeps an existing fault lease when Stria is temporarily unreachable or rejects its key, and lets that lease expire locally rather than extending it. A rejected key is logged as a configuration error.
 
-The Stria host reads its PostgreSQL connection string from `ConnectionStrings:Stria`. `Database:MigrateOnStartup` controls whether migrations run at startup. Retention settings are `Retention:MaxAgeDays`, `Retention:MaxClearedExperiments`, and `Retention:SweepIntervalMinutes`; expiry sweeps use `Expiry:SweepIntervalSeconds`. Data Protection keys are stored at `DataProtection:KeysPath`.
+The Stria host reads its PostgreSQL connection string from `ConnectionStrings:Stria`. `Database:MigrateOnStartup` controls whether migrations run at startup. Retention settings are `Retention:MaxAgeDays`, `Retention:MaxClearedExperiments`, and `Retention:SweepIntervalMinutes`; expiry sweeps use `Expiry:SweepIntervalSeconds`. Data Protection keys are stored at `DataProtection:KeysPath`. Data-plane key hashes are read from `DataPlane:ServiceKeyHashes`; entries must name a registered service and hold a 64-character hex SHA-256, or startup fails.

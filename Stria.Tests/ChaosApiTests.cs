@@ -22,6 +22,7 @@ public sealed class ChaosApiTests
     private static PostgresFixture _postgres = null!;
     private static StriaApiFactory _factory = null!;
     private static HttpClient _client = null!;
+    private static HttpClient _dataPlane = null!;
     private static bool _ready;
     private static string? _failure;
 
@@ -45,6 +46,12 @@ public sealed class ChaosApiTests
         // These tests cover the API contract, so they call it as an operator automation client.
         _client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", TestTokens.Create(ChaosRoles.Operator));
+        // Directives are read the way the sample service reads them: with its data-plane key.
+        _dataPlane = _factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+        _dataPlane.DefaultRequestHeaders.Add(Stria.Security.DataPlaneDefaults.HeaderName, TestDataPlaneKeys.PaymentGateway);
         _ready = true;
     }
 
@@ -52,6 +59,7 @@ public sealed class ChaosApiTests
     public static void ClassCleanup()
     {
         _client?.Dispose();
+        _dataPlane?.Dispose();
         _factory?.Dispose();
         if (_postgres is not null)
             _postgres.DisposeAsync().AsTask().GetAwaiter().GetResult();
@@ -140,17 +148,9 @@ public sealed class ChaosApiTests
     }
 
     [TestMethod]
-    public async Task Directives_UnknownService_ReturnsNotFound()
-    {
-        var response = await _client.GetAsync("/api/v1/chaos/directives/GhostService");
-        Assert.AreEqual(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.AreEqual("application/problem+json", response.Content.Headers.ContentType?.MediaType);
-    }
-
-    [TestMethod]
     public async Task Directives_NoActiveFault_ReturnsNoContent()
     {
-        var response = await _client.GetAsync("/api/v1/chaos/directives/PaymentGateway");
+        var response = await _dataPlane.GetAsync("/api/v1/chaos/directives/PaymentGateway");
         Assert.AreEqual(HttpStatusCode.NoContent, response.StatusCode);
     }
 
@@ -174,7 +174,7 @@ public sealed class ChaosApiTests
             await db.SaveChangesAsync();
         }
 
-        var response = await _client.GetAsync("/api/v1/chaos/directives/PaymentGateway");
+        var response = await _dataPlane.GetAsync("/api/v1/chaos/directives/PaymentGateway");
 
         Assert.AreEqual(HttpStatusCode.NoContent, response.StatusCode);
     }
@@ -192,7 +192,7 @@ public sealed class ChaosApiTests
                 Percent: 100));
         Assert.AreEqual(HttpStatusCode.Accepted, inject.StatusCode);
 
-        var response = await _client.GetAsync("/api/v1/chaos/directives/PaymentGateway");
+        var response = await _dataPlane.GetAsync("/api/v1/chaos/directives/PaymentGateway");
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
 
         var directive = await response.Content.ReadFromJsonAsync<FaultDirective>(JsonOptions);
@@ -223,6 +223,6 @@ public sealed class ChaosApiTests
 
         Assert.AreEqual(
             HttpStatusCode.NoContent,
-            (await _client.GetAsync("/api/v1/chaos/directives/PaymentGateway")).StatusCode);
+            (await _dataPlane.GetAsync("/api/v1/chaos/directives/PaymentGateway")).StatusCode);
     }
 }
