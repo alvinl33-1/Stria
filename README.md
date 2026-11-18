@@ -83,7 +83,7 @@ dotnet test Stria.sln --configuration Release --no-build
 
 `main` branch protection requires `build-and-test`, `dependency-audit`, `dependency-review`, and `container-build`. `dependency-review` needs a public repository (or GitHub Advanced Security); drop it from the required checks if the repository becomes private. Administrators can bypass these rules; do not use that bypass for normal changes.
 
-The Phase 2 security plan is in [docs/PHASE_2_PLAN.md](docs/PHASE_2_PLAN.md); its evidence and the starting point for Phase 3 are in [docs/PHASE_2_HANDOFF.md](docs/PHASE_2_HANDOFF.md).
+The Phase 2 security plan is in [docs/PHASE_2_PLAN.md](docs/PHASE_2_PLAN.md); its evidence is in [docs/PHASE_2_HANDOFF.md](docs/PHASE_2_HANDOFF.md). Phase 3 (hosted demo on Azure Container Apps) is planned in [docs/PHASE_3_PLAN.md](docs/PHASE_3_PLAN.md).
 
 ## Authentication
 
