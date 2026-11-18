@@ -18,7 +18,7 @@
         <p>Introduce a controlled fault to test how dependent systems respond. Changes take effect immediately.</p>
     </section>
 
-    <KillSwitchPanel EngagedChanged="engaged => _killSwitchEngaged = engaged" />
+    <KillSwitchPanel EngagedChanged="OnKillSwitchChanged" />
 
     <section class="service-grid" aria-label="Service fault controls">
         <article class="service-panel">
@@ -76,7 +76,7 @@
             <div><div class="eyebrow">LIVE TELEMETRY</div><h2>Service health</h2></div>
             <span class="poll-note">Updates every 3 seconds</span>
         </div>
-        <ActiveFaultsTable />
+        <ActiveFaultsTable @ref="_faultsTable" />
     </section>
 </main>
 
@@ -84,6 +84,15 @@
     private string? _consoleLogMessage;
     private bool _isSubmitting;
     private bool _killSwitchEngaged; // inject buttons only; clearing stays allowed while engaged
+    private ActiveFaultsTable? _faultsTable;
+
+    // Engaging clears every fault server-side; show that now rather than on the next poll.
+    private async Task OnKillSwitchChanged(bool engaged)
+    {
+        _killSwitchEngaged = engaged;
+        if (engaged && _faultsTable is not null)
+            await _faultsTable.RefreshAsync();
+    }
 
     // The server derives the actor from the signed-in user, so no TriggeredBy is sent.
     private sealed record FaultInjectionRequest(string TargetService, string FaultType, int? LatencyMs = null);

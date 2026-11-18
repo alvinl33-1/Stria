@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
@@ -36,12 +37,19 @@ public static class HttpHardening
     /// <summary>Largest accepted request body on /api/v1/chaos. A fault request is well under 1 KB.</summary>
     public const long MaxChaosBodyBytes = 16 * 1024;
 
-    // 'wasm-unsafe-eval' is required by Blazor WebAssembly; 'unsafe-inline' styles cover the
-    // inline width on the fault status bars. form-action allows the Entra sign-out redirect.
-    public const string ContentSecurityPolicy =
-        "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; " +
+    private const string CspNonceItemKey = "Stria.CspNonce";
+
+    // 'wasm-unsafe-eval' is required by Blazor WebAssembly; the per-request nonce admits Blazor's
+    // inline <script type="importmap"> (App.razor passes it to <ImportMap>) and nothing else.
+    // 'unsafe-inline' styles cover the inline width on the fault status bars. form-action allows
+    // the Entra sign-out redirect.
+    public static string ContentSecurityPolicyFor(string nonce) =>
+        $"default-src 'self'; script-src 'self' 'nonce-{nonce}' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; " +
         "img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; " +
         "frame-ancestors 'none'; form-action 'self' https://login.microsoftonline.com";
+
+    /// <summary>The CSP nonce issued for this response by <see cref="UseSecurityHeaders"/>.</summary>
+    public static string? GetCspNonce(HttpContext context) => context.Items[CspNonceItemKey] as string;
 
     public static IServiceCollection AddChaosRateLimiting(this IServiceCollection services, IConfiguration configuration)
     {
@@ -124,9 +132,9 @@ public static class HttpHardening
             headers.XContentTypeOptions = "nosniff";
             headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
             headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()";
-            // Report-only until the dashboard has been checked in a browser with no violations;
-            // then rename the header to Content-Security-Policy to enforce it.
-            headers["Content-Security-Policy-Report-Only"] = ContentSecurityPolicy;
+            var nonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)); // hex: nothing for Razor to HTML-encode
+            ctx.Items[CspNonceItemKey] = nonce;
+            headers.ContentSecurityPolicy = ContentSecurityPolicyFor(nonce);
             await next(ctx);
         });
 

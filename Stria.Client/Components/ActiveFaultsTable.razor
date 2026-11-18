@@ -104,6 +104,9 @@
         }
     }
 
+    /// <summary>Reloads immediately instead of waiting for the next poll (e.g. after a kill-switch engage).</summary>
+    public Task RefreshAsync() => RefreshFaults();
+
     private async Task RefreshFaults()
     {
         try

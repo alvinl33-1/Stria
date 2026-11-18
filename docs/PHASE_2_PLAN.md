@@ -1,7 +1,7 @@
 # Stria Phase 2 Plan — Authorized Control Plane
 
-**Status:** In progress. Steps 0–5 are implemented. Step 6 (verification and handoff) is next;
-see [PHASE_2_HANDOFF.md](PHASE_2_HANDOFF.md) for current state and where to start.
+**Status:** Complete. Steps 0–6 are implemented and merged; the exit evidence is in
+[PHASE_2_HANDOFF.md](PHASE_2_HANDOFF.md).
 
 **Scope guard:** Phase 2 is a security/identity phase. Do not provision Azure resources or
 incur subscription cost. Use a test Entra tenant or a local OIDC provider for development
@@ -225,7 +225,7 @@ own claims, so there is nothing to rename and it needs no case.)
 
 **Acceptance:** the authorization matrix is enforced and every mutation has a stable actor ID.
 
-### Step 3 — CSRF, limits, and security headers (implemented; CSP still report-only)
+### Step 3 — CSRF, limits, and security headers (implemented; CSP enforced in Step 6)
 
 - Require antiforgery tokens for cookie-authenticated mutations.
 - Add request-size limits, rate limits, and problem-details responses.
@@ -276,7 +276,7 @@ banner to every viewer while engaged and the controls only to `ChaosAdmin`.
 `KillSwitchApiTests` and `KillSwitchOrchestratorTests` cover the matrix column, `409`
 suppression, clearing, release, expiry interaction and an engage-versus-injection race.
 
-### Step 6 — Verification and handoff
+### Step 6 — Verification and handoff (implemented)
 
 - Run the full test suite and CI; add an authenticated Compose smoke test.
 - Update the README, Phase 2 handoff, threat model, and evidence table.
@@ -284,6 +284,14 @@ suppression, clearing, release, expiry interaction and an engage-versus-injectio
 - Review logs and error responses for secret leakage.
 
 **Acceptance:** the Phase 2 exit evidence is reproducible from a clean checkout.
+
+**As built:** `scripts/compose-smoke.sh` checks a running stack without signing in (health,
+anonymous `401`s, data-plane isolation, enforced CSP, Blazor asset); signed-in flows were walked
+through in a browser and recorded in the handoff's evidence table. The CSP is now enforced: Blazor's
+inline import map is admitted by a per-request nonce. CI's `container-build` starts the API image
+as Production and fetches the Blazor script its pages reference. Compose logs at default and Debug
+auth levels and the error responses contain no secrets. `main` requires `build-and-test`,
+`dependency-audit`, `dependency-review` and `container-build`.
 
 ## 5. Test matrix
 
@@ -326,4 +334,4 @@ Add separate cases for rate limits (`429`), oversized bodies (`413`), missing an
 - [x] Data-plane credentials are service-scoped and cannot be used on control routes.
 - [x] Rate limits, request-size limits, and CSRF protection are tested.
 - [x] Kill switch clears and suppresses faults, with audit history.
-- [ ] README and handoff document the auth setup, required CI checks, and Phase 2 evidence.
+- [x] README and handoff document the auth setup, required CI checks, and Phase 2 evidence.

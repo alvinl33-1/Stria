@@ -50,7 +50,9 @@ Compose starts PostgreSQL, waits for its health check, starts Stria, and starts 
 
 Stop the stack with `Ctrl+C`; use `docker compose down` to stop and remove the containers. The named `stria-pgdata` volume retains database contents when containers are removed, and `stria-dpkeys` retains Data Protection keys.
 
-For a smoke test, open the dashboard, inject bounded latency for `PaymentGateway`, and call `http://localhost:8081/work` repeatedly to observe the delay. Clear the fault and confirm the delay stops after the lease expires. The API process and database readiness endpoints should both return `200`:
+For an automated smoke test of the running stack, run `scripts/compose-smoke.sh` from the repository root. It reads the sample service's key from `.env` and checks health, that anonymous callers get `401` on every control and directive route, data-plane key isolation, the enforced Content Security Policy, and that the image serves the Blazor script. Signed-in flows need a browser.
+
+For a manual check, open the dashboard, inject bounded latency for `PaymentGateway`, and call `http://localhost:8081/work` repeatedly to observe the delay. Clear the fault and confirm the delay stops after the lease expires. The API process and database readiness endpoints should both return `200`:
 
 ```sh
 curl -i http://localhost:8080/healthz
@@ -66,7 +68,7 @@ GitHub Actions runs on pushes and pull requests to `main`:
 | `build-and-test` | Formatting is clean, the Release build has no warnings, all tests pass, and TRX/coverage evidence is uploaded |
 | `dependency-audit` | No known vulnerable direct or transitive NuGet packages are referenced |
 | `dependency-review` | A pull request does not introduce high-severity vulnerable dependencies (public repositories; private repositories need GitHub Advanced Security) |
-| `container-build` | The control-plane, standalone dashboard, and sample-service Dockerfiles still build |
+| `container-build` | The control-plane, standalone dashboard, and sample-service Dockerfiles still build, and the control-plane image starts in Production mode and serves the Blazor script its pages reference |
 
 Integration tests use Testcontainers and PostgreSQL. CI sets `STRIA_REQUIRE_DOCKER_TESTS=true`, so the job fails rather than silently skipping PostgreSQL coverage when Docker cannot start. Dependabot checks NuGet packages, GitHub Actions, and Docker base images weekly.
 
@@ -79,9 +81,9 @@ dotnet build Stria.sln --configuration Release --no-restore -warnaserror
 dotnet test Stria.sln --configuration Release --no-build
 ```
 
-Configure `main` branch protection to require `build-and-test`, `dependency-audit`, and `container-build`. The `dependency-review` job starts running when the repository is public; private repositories need GitHub Advanced Security for it, so do not require it while the repository is private. Administrators can bypass these rules; do not use that bypass for normal changes.
+`main` branch protection requires `build-and-test`, `dependency-audit`, `dependency-review`, and `container-build`. `dependency-review` needs a public repository (or GitHub Advanced Security); drop it from the required checks if the repository becomes private. Administrators can bypass these rules; do not use that bypass for normal changes.
 
-The Phase 2 security plan is in [docs/PHASE_2_PLAN.md](docs/PHASE_2_PLAN.md); current progress and next steps are in [docs/PHASE_2_HANDOFF.md](docs/PHASE_2_HANDOFF.md).
+The Phase 2 security plan is in [docs/PHASE_2_PLAN.md](docs/PHASE_2_PLAN.md); its evidence and the starting point for Phase 3 are in [docs/PHASE_2_HANDOFF.md](docs/PHASE_2_HANDOFF.md).
 
 ## Authentication
 
@@ -91,9 +93,9 @@ Operators sign in with Microsoft Entra ID (OpenID Connect, authorization-code fl
 |---|---|
 | `ChaosViewer` | View active faults |
 | `ChaosOperator` | View, inject and clear faults |
-| `ChaosAdmin` | Everything an operator can (admin-only features arrive in Phase 2 Step 5) |
+| `ChaosAdmin` | Everything an operator can, plus engage and release the global kill switch |
 
-Control-plane routes accept the browser session cookie or an Entra bearer token. Unauthenticated API calls get `401`, missing roles `403`. Cookie-authenticated `POST`s must send an antiforgery token in the `X-XSRF-TOKEN` header (from `GET /api/v1/antiforgery/token`); bearer callers are exempt. Request bodies on `/api/v1/chaos` are capped at 16 KB (`413`), and reads and mutations are rate limited per user (`429` with `Retry-After`). Only `/healthz` and `/readyz` are anonymous.
+Control-plane routes accept the browser session cookie or an Entra bearer token. Unauthenticated API calls get `401`, missing roles `403`. Cookie-authenticated `POST`s must send an antiforgery token in the `X-XSRF-TOKEN` header (from `GET /api/v1/antiforgery/token`); bearer callers are exempt. Request bodies on `/api/v1/chaos` are capped at 16 KB (`413`), and reads and mutations are rate limited per user (`429` with `Retry-After`). Only `/healthz` and `/readyz` are anonymous. Pages are served with an enforced Content Security Policy; the only inline script, Blazor's import map, is admitted by a per-request nonce.
 
 ### Data-plane keys
 
@@ -106,6 +108,8 @@ Keys cross the plain-HTTP Compose network unencrypted, which is acceptable only 
 `GET /api/v1/me` returns the caller's object ID and display name (any signed-in caller).
 
 `GET /api/v1/chaos/faults` returns active, unexpired experiments (`ChaosViewer` or higher).
+
+`GET /api/v1/chaos/kill-switch` returns whether the global kill switch is engaged, with who changed it, when, and why (`ChaosViewer` or higher). `POST /api/v1/chaos/kill-switch/engage` and `/release` change it (`ChaosAdmin` only) and take `{"reason":"..."}` (required, at most 500 characters); they return `200` with the new state and change nothing if it is already in that state. Engaging clears every active experiment. While engaged, `POST /api/v1/chaos/inject` with a fault returns `409 Conflict` (clearing with `"None"` still works) and services receive `204` from the directive route. Every engage and release is kept as an audit record.
 
 `GET /api/v1/chaos/directives/{service}` returns the directive for the calling service, or `204 No Content` when it has no active fault (requires that service's data-plane key; see [Data-plane keys](#data-plane-keys)). Asking for any other target, including an unregistered one, returns `403`.
 

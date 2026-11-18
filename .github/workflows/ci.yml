@@ -152,6 +152,33 @@ jobs:
       - name: Build control-plane image
         run: docker build --file Stria.API/Dockerfile --tag stria-api:ci .
 
+      # The image can differ from the local build (a restore-before-copy Dockerfile once dropped
+      # _framework/blazor.web.js). Start it as Production with placeholder identity settings
+      # (nothing is called at startup) and fetch the Blazor script the page actually references.
+      - name: Smoke-test control-plane image assets
+        run: |
+          docker run -d --name stria-api-probe -p 18080:8080 \
+            -e ASPNETCORE_ENVIRONMENT=Production \
+            -e ConnectionStrings__Stria="Host=127.0.0.1;Database=unused;Username=unused" \
+            -e AzureAd__Instance=https://login.microsoftonline.com/ \
+            -e AzureAd__TenantId=00000000-0000-0000-0000-000000000001 \
+            -e AzureAd__ClientId=00000000-0000-0000-0000-000000000002 \
+            -e AzureAd__ClientSecret=ci-placeholder \
+            -e AzureAdApi__Instance=https://login.microsoftonline.com/ \
+            -e AzureAdApi__TenantId=00000000-0000-0000-0000-000000000001 \
+            -e AzureAdApi__ClientId=00000000-0000-0000-0000-000000000002 \
+            -e DataPlane__ServiceKeyHashes__PaymentGateway=0000000000000000000000000000000000000000000000000000000000000000 \
+            stria-api:ci
+          for i in $(seq 1 30); do curl -sf http://localhost:18080/healthz >/dev/null && break; sleep 1; done
+          asset=$(curl -sf http://localhost:18080/access-denied | grep -o '_framework/blazor\.web\.[a-z0-9]*\.js' | head -1)
+          if [ -z "$asset" ]; then echo "::error::Page does not reference _framework/blazor.web.js"; docker logs stria-api-probe; exit 1; fi
+          curl -sf -o /dev/null "http://localhost:18080/$asset" || { echo "::error::$asset is not served by the image"; docker logs stria-api-probe; exit 1; }
+          echo "Served $asset"
+
+      - name: Stop control-plane probe
+        if: always()
+        run: docker rm -f stria-api-probe || true
+
       - name: Build standalone dashboard image
         run: docker build --file Stria.Client/Dockerfile --tag stria-client:ci .
 
