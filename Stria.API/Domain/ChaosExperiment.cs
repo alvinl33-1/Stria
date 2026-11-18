@@ -19,6 +19,9 @@ public class ChaosExperiment
     /// <summary>Who started it. Set by the server from the authenticated caller.</summary>
     public string TriggeredBy { get; set; } = "Manual";
 
+    /// <summary>Display name of <see cref="TriggeredBy"/> at the time, for people reading the audit trail.</summary>
+    public string? TriggeredByName { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>
@@ -31,4 +34,7 @@ public class ChaosExperiment
 
     /// <summary>Who ended it: the caller who cleared/replaced it, or "system:expiry".</summary>
     public string? ClearedBy { get; set; }
+
+    /// <summary>Display name of <see cref="ClearedBy"/>; null for expiry and for callers without a name.</summary>
+    public string? ClearedByName { get; set; }
 }

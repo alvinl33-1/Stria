@@ -1,8 +1,12 @@
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Stria;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
 namespace Stria.Tests.TestSupport;
 
@@ -14,11 +18,14 @@ namespace Stria.Tests.TestSupport;
 public sealed class StriaApiFactory : WebApplicationFactory<Program>
 {
     private readonly PostgresFixture _postgres;
+    private readonly IReadOnlyDictionary<string, string?> _overrides;
     private readonly string _dpKeysPath;
 
-    public StriaApiFactory(PostgresFixture postgres)
+    /// <param name="overrides">Configuration applied after the test defaults (e.g. tighter rate limits).</param>
+    public StriaApiFactory(PostgresFixture postgres, IReadOnlyDictionary<string, string?>? overrides = null)
     {
         _postgres = postgres;
+        _overrides = overrides ?? new Dictionary<string, string?>();
         _dpKeysPath = Path.Combine(Path.GetTempPath(), "stria-tests-dpkeys", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_dpKeysPath);
     }
@@ -34,14 +41,43 @@ public sealed class StriaApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Expiry:SweepIntervalSeconds", "3600");
         builder.UseSetting("Retention:SweepIntervalMinutes", "60");
 
-        builder.ConfigureServices(services =>
+        // Placeholder identity settings: Microsoft.Identity.Web validates that they exist, but
+        // the overrides below mean nothing ever contacts Entra.
+        builder.UseSetting("AzureAd:TenantId", "00000000-0000-0000-0000-000000000001");
+        builder.UseSetting("AzureAd:ClientId", "00000000-0000-0000-0000-000000000002");
+        builder.UseSetting("AzureAdApi:TenantId", "00000000-0000-0000-0000-000000000001");
+        builder.UseSetting("AzureAdApi:ClientId", "00000000-0000-0000-0000-000000000002");
+
+        // High limits so ordinary tests never hit 429; the rate-limit tests override these.
+        builder.UseSetting("RateLimits:ReadPermitLimit", "10000");
+        builder.UseSetting("RateLimits:MutatePermitLimit", "10000");
+
+        foreach (var (key, value) in _overrides)
+            builder.UseSetting(key, value);
+
+        builder.ConfigureTestServices(services =>
         {
-            // Drop the noisy demo traffic logger in API tests; keep expiry/retention registered.
-            var traffic = services.FirstOrDefault(d =>
-                d.ServiceType == typeof(IHostedService) &&
-                d.ImplementationType == typeof(TrafficSimulatorService));
-            if (traffic is not null)
-                services.Remove(traffic);
+            // Bearer: trust only the test signing key and never fetch Entra metadata.
+            services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
+            {
+                options.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(
+                    new OpenIdConnectConfiguration { Issuer = TestTokens.Issuer });
+
+                var p = options.TokenValidationParameters;
+                p.ValidIssuer = TestTokens.Issuer;
+                p.ValidAudiences = [TestTokens.Audience];
+                p.IssuerSigningKey = TestTokens.Key;
+                // Remove Entra-specific validators that expect real Entra issuers and keys.
+                p.IssuerValidator = null;
+                p.AudienceValidator = null;
+                p.IssuerSigningKeyValidator = null;
+                p.IssuerSigningKeyValidatorUsingConfiguration = null;
+            });
+
+            // Cookie: swap the real cookie handler for the header-driven test handler.
+            services.Configure<AuthenticationOptions>(options =>
+                options.SchemeMap[CookieAuthenticationDefaults.AuthenticationScheme].HandlerType =
+                    typeof(TestCookieHandler));
         });
     }
 

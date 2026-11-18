@@ -83,7 +83,7 @@ public sealed class DatabaseChaosOrchestratorTests
                 TargetService: "PaymentGateway",
                 FaultType: "Latency",
                 LatencyMs: 750),
-            "test-actor");
+            new Actor("test-actor", null));
 
         var all = await LoadForServiceAsync("PaymentGateway");
         var active = all.SingleOrDefault(e => e.Status == ExperimentStatus.Active);
@@ -119,19 +119,21 @@ public sealed class DatabaseChaosOrchestratorTests
                 TargetService: "AuthService",
                 FaultType: "Latency",
                 LatencyMs: 100),
-            "new-actor");
+            new Actor("new-actor", "New Actor"));
 
         var all = await LoadForServiceAsync("AuthService");
         var active = all.SingleOrDefault(e => e.Status == ExperimentStatus.Active);
         Assert.IsNotNull(active);
         Assert.AreEqual(100, active.LatencyMs);
         Assert.AreEqual("new-actor", active.TriggeredBy);
+        Assert.AreEqual("New Actor", active.TriggeredByName);
 
         var cleared = all.SingleOrDefault(e => e.Status == ExperimentStatus.Cleared);
         Assert.IsNotNull(cleared);
         Assert.IsNotNull(cleared.ClearedAt);
         // The actor who replaced the fault is recorded as ClearedBy.
         Assert.AreEqual("new-actor", cleared.ClearedBy);
+        Assert.AreEqual("New Actor", cleared.ClearedByName);
     }
 
     [TestMethod]
@@ -155,7 +157,7 @@ public sealed class DatabaseChaosOrchestratorTests
             new FaultInjectionRequest(
                 TargetService: "PaymentGateway",
                 FaultType: "None"),
-            "clearer");
+            new Actor("clearer", null));
 
         var all = await LoadForServiceAsync("PaymentGateway");
         Assert.IsNull(all.SingleOrDefault(e => e.Status == ExperimentStatus.Active));
@@ -254,6 +256,7 @@ public sealed class DatabaseChaosOrchestratorTests
         var cleared = all.SingleOrDefault(e => e.Status == ExperimentStatus.Cleared);
         Assert.IsNotNull(cleared);
         Assert.AreEqual(DatabaseChaosOrchestrator.ExpiryActor, cleared.ClearedBy);
+        Assert.IsNull(cleared.ClearedByName);
         Assert.IsNotNull(cleared.ClearedAt);
     }
 
@@ -290,13 +293,13 @@ public sealed class DatabaseChaosOrchestratorTests
                     TargetService: "PaymentGateway",
                     FaultType: "Latency",
                     LatencyMs: 300),
-                "actor-1"),
+                new Actor("actor-1", null)),
             sut2.InjectFaultAsync(
                 new FaultInjectionRequest(
                     TargetService: "PaymentGateway",
                     FaultType: "Latency",
                     LatencyMs: 500),
-                "actor-2"));
+                new Actor("actor-2", null)));
 
         var all = await LoadForServiceAsync("PaymentGateway");
         var active = all.Where(e => e.Status == ExperimentStatus.Active).ToList();

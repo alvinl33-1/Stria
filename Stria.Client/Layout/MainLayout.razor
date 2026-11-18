@@ -1,6 +1,18 @@
 ﻿@inherits LayoutComponentBase
 
 <div class="app-shell">
+    <AuthorizeView>
+        <Authorized>
+            <div class="session-bar">
+                <span class="session-user">Signed in as <strong>@context.User.Identity?.Name</strong></span>
+                <form action="authentication/logout" method="post">
+                    <AntiforgeryToken/>
+                    <input type="hidden" name="returnUrl" value="/"/>
+                    <button type="submit" class="session-signout">Sign out</button>
+                </form>
+            </div>
+        </Authorized>
+    </AuthorizeView>
     @Body
 </div>
 

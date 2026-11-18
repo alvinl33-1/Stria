@@ -1,6 +1,6 @@
 # Stria Phase 2 Plan — Authorized Control Plane
 
-**Status:** In progress. Step 0 (CI and quality gates) is implemented locally and awaiting its first GitHub Actions run.
+**Status:** In progress. Steps 0–3 are implemented locally (Step 0 awaits its first GitHub Actions run). Step 4 (data-plane credential) is next.
 
 **Scope guard:** Phase 2 is a security/identity phase. Do not provision Azure resources or
 incur subscription cost. Use a test Entra tenant or a local OIDC provider for development
@@ -55,13 +55,13 @@ not share credentials.
 These are not new Phase 2 features, but they should be handled while the control plane is being
 secured:
 
-- `TrafficSimulatorService` is still registered as a hosted service and logs active faults at
-  `Critical`. Remove or replace it so routine fault state does not create alert noise.
-- The dashboard prints raw exception text (`ex.Message`) to operators. Replace it with concise
-  operator-safe messages and keep diagnostics in structured logs.
-- `CpuSpike` remains visible in the dashboard and accepted by the API even though the sample
-  service does not execute it. Hide it from operator controls in Phase 2; remove it fully in
-  Phase 5 unless a capped implementation exists.
+- ~~`TrafficSimulatorService` is still registered as a hosted service and logs active faults at
+  `Critical`.~~ Resolved: the service has been removed.
+- ~~The dashboard prints raw exception text (`ex.Message`) to operators.~~ Resolved in Step 3:
+  the dashboard shows operator-safe messages and diagnostics stay in structured logs.
+- `CpuSpike` is now hidden from the dashboard's operator controls but is still accepted by the
+  API even though the sample service does not execute it. Remove it fully in Phase 5 unless a
+  capped implementation exists.
 - Health and readiness endpoints remain anonymous by design, but must not expose configuration
   or exception details.
 - Compose still migrates on startup for local convenience. Keep that behavior scoped to local
@@ -174,7 +174,7 @@ shows a persistent banner while it is engaged.
 
 ## 4. Work breakdown
 
-### Step 0 — CI and quality gates (current)
+### Step 0 — CI and quality gates (implemented)
 
 - Add cached NuGet restore. Direct package versions are exact in the project files; repository-wide
   lock files are intentionally deferred because SDK implicit packages change between .NET SDK
@@ -193,7 +193,7 @@ shows a persistent banner while it is engaged.
 or a broken Dockerfile fails the pipeline. The auth tests added in later steps plug into the same
 `build-and-test` job.
 
-### Step 1 — Identity foundation and local auth harness
+### Step 1 — Identity foundation and local auth harness (implemented)
 
 - Register the Entra application(s) in a test tenant and define the three app roles, redirect URIs,
   API scope, and test group assignments.
@@ -207,7 +207,7 @@ or a broken Dockerfile fails the pipeline. The auth tests added in later steps p
 **Acceptance:** an unauthenticated request is challenged; a valid test token creates an
 authenticated principal; no secret is committed.
 
-### Step 2 — Route authorization and trusted actors
+### Step 2 — Route authorization and trusted actors (implemented)
 
 - Apply `Chaos.View`, `Chaos.Operate`, and `Chaos.Admin` policies to the API route groups.
 - Protect the dashboard with `AuthorizeRouteView` and a sign-in prompt; show the signed-in user.
@@ -217,7 +217,7 @@ authenticated principal; no secret is committed.
 
 **Acceptance:** the authorization matrix is enforced and every mutation has a stable actor ID.
 
-### Step 3 — CSRF, limits, and security headers
+### Step 3 — CSRF, limits, and security headers (implemented; CSP still report-only)
 
 - Require antiforgery tokens for cookie-authenticated mutations.
 - Add request-size limits, rate limits, and problem-details responses.
@@ -288,8 +288,8 @@ Add separate cases for rate limits (`429`), oversized bodies (`413`), missing an
 - [ ] CI fails on formatting, build warnings, vulnerable packages, or broken images.
 - [ ] Anonymous control-plane and directive requests are rejected.
 - [ ] Viewers cannot mutate; operators cannot administer the kill switch.
-- [ ] Actor IDs come from validated claims and are covered by tests.
+- [x] Actor IDs come from validated claims and are covered by tests.
 - [ ] Data-plane credentials are service-scoped and cannot be used on control routes.
-- [ ] Rate limits, request-size limits, and CSRF protection are tested.
+- [x] Rate limits, request-size limits, and CSRF protection are tested.
 - [ ] Kill switch clears and suppresses faults, with audit history.
 - [ ] README and handoff document the auth setup, required CI checks, and Phase 2 evidence.

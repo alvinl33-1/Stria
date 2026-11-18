@@ -7,10 +7,10 @@ public interface IChaosOrchestrator
 {
     /// <summary>
     /// Activates a fault for the request's target (replacing any active one), or clears the
-    /// target when the fault type is "None". <paramref name="triggeredBy"/> must come from the
-    /// server (the authenticated caller), never from the request body.
+    /// target when the fault type is "None". <paramref name="actor"/> must come from the server
+    /// (the authenticated caller's validated claims), never from the request body.
     /// </summary>
-    Task InjectFaultAsync(FaultInjectionRequest request, string triggeredBy,
+    Task InjectFaultAsync(FaultInjectionRequest request, Actor actor,
         CancellationToken cancellationToken = default);
     Task<ChaosExperiment?> GetActiveFaultForServiceAsync(string serviceName,
         CancellationToken cancellationToken = default);

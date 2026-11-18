@@ -58,3 +58,4 @@
     .environment-tag { font-size: 9px; }
     .section-heading { align-items: start; gap: 10px; flex-direction: column; }
 }
+.service-panel .view-only { margin-top: 17px; color: var(--muted); font-family: "SFMono-Regular", Consolas, monospace; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }

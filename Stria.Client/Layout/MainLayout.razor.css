@@ -3,6 +3,30 @@
     background: #f4f5f0;
 }
 
+.session-bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 14px;
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 10px clamp(18px, 4vw, 52px) 0;
+    color: #69736e;
+    font-size: 12px;
+}
+
+.session-bar form { margin: 0; }
+
+.session-signout {
+    padding: 4px 0;
+    border: 0;
+    background: transparent;
+    color: #606b65;
+    font-size: 12px;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
 #blazor-error-ui {
     color-scheme: light;
     background: #fff4d6;

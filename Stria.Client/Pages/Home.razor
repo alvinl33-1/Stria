@@ -1,7 +1,7 @@
 @page "/"
-@using System.Net.Http.Json
-@using Stria.Client.Components
-@inject HttpClient Http
+@attribute [Authorize(Policy = ChaosPolicies.View)]
+@inject ChaosApiClient Api
+@inject ILogger<Home> Logger
 
 <PageTitle>Stria | Resilience Console</PageTitle>
 
@@ -23,28 +23,44 @@
             <div class="service-index">01 <span>PAYMENTS</span></div>
             <h2>Payment Gateway</h2>
             <p>Add a three second delay to payment requests.</p>
-            <div class="service-actions">
-                <button class="action-button action-warn" disabled="@_isSubmitting" @onclick='() => CommitChaos("PaymentGateway", "Latency")'>Inject latency <span>↗</span></button>
-                <button class="clear-button" disabled="@_isSubmitting" @onclick='() => CommitChaos("PaymentGateway", "None")'>Clear fault</button>
-            </div>
+            <AuthorizeView Policy="@ChaosPolicies.Operate">
+                <Authorized>
+                    <div class="service-actions">
+                        <button class="action-button action-warn" disabled="@_isSubmitting" @onclick='() => CommitChaos("PaymentGateway", "Latency")'>Inject latency <span>↗</span></button>
+                        <button class="clear-button" disabled="@_isSubmitting" @onclick='() => CommitChaos("PaymentGateway", "None")'>Clear fault</button>
+                    </div>
+                </Authorized>
+                <NotAuthorized><p class="view-only">View only</p></NotAuthorized>
+            </AuthorizeView>
         </article>
         <article class="service-panel">
             <div class="service-index">02 <span>IDENTITY</span></div>
             <h2>Auth Service</h2>
             <p>Return simulated HTTP 503 responses.</p>
-            <div class="service-actions">
-                <button class="action-button action-danger" disabled="@_isSubmitting" @onclick='() => CommitChaos("AuthService", "HttpFailure")'>Inject HTTP 503 <span>↗</span></button>
-                <button class="clear-button" disabled="@_isSubmitting" @onclick='() => CommitChaos("AuthService", "None")'>Clear fault</button>
-            </div>
+            <AuthorizeView Policy="@ChaosPolicies.Operate">
+                <Authorized>
+                    <div class="service-actions">
+                        <button class="action-button action-danger" disabled="@_isSubmitting" @onclick='() => CommitChaos("AuthService", "HttpFailure")'>Inject HTTP 503 <span>↗</span></button>
+                        <button class="clear-button" disabled="@_isSubmitting" @onclick='() => CommitChaos("AuthService", "None")'>Clear fault</button>
+                    </div>
+                </Authorized>
+                <NotAuthorized><p class="view-only">View only</p></NotAuthorized>
+            </AuthorizeView>
         </article>
         <article class="service-panel">
             <div class="service-index">03 <span>INVENTORY</span></div>
             <h2>Inventory API</h2>
-            <p>Simulate elevated CPU load on inventory.</p>
-            <div class="service-actions">
-                <button class="action-button action-cool" disabled="@_isSubmitting" @onclick='() => CommitChaos("InventoryAPI", "CpuSpike")'>Induce CPU spike <span>↗</span></button>
-                <button class="clear-button" disabled="@_isSubmitting" @onclick='() => CommitChaos("InventoryAPI", "None")'>Clear fault</button>
-            </div>
+            <p>CPU spike injection is not available yet.</p>
+            <AuthorizeView Policy="@ChaosPolicies.Operate">
+                <Authorized>
+                    <div class="service-actions">
+                        @* CpuSpike is hidden until Phase 5 decides whether it is implemented or removed:
+                           no consumer applies it yet, so the button would report success for a no-op. *@
+                        <button class="clear-button" disabled="@_isSubmitting" @onclick='() => CommitChaos("InventoryAPI", "None")'>Clear fault</button>
+                    </div>
+                </Authorized>
+                <NotAuthorized><p class="view-only">View only</p></NotAuthorized>
+            </AuthorizeView>
         </article>
     </section>
 
@@ -65,7 +81,9 @@
 @code {
     private string? _consoleLogMessage;
     private bool _isSubmitting;
-    private sealed record FaultInjectionRequest(string TargetService, string FaultType, int? LatencyMs = null, string TriggeredBy = "ManualDashboard");
+
+    // The server derives the actor from the signed-in user, so no TriggeredBy is sent.
+    private sealed record FaultInjectionRequest(string TargetService, string FaultType, int? LatencyMs = null);
 
     private async Task CommitChaos(string targetService, string faultType)
     {
@@ -74,11 +92,12 @@
 
         _isSubmitting = true;
         _consoleLogMessage = $"Sending {faultType} command to {targetService}…";
+        var action = faultType == "None" ? $"clear {targetService}" : $"inject {faultType} on {targetService}";
         try
         {
             int? latencyMs = string.Equals(faultType, "Latency", StringComparison.OrdinalIgnoreCase) ? 3000 : null;
             var payload = new FaultInjectionRequest(targetService, faultType, latencyMs);
-            using var response = await Http.PostAsJsonAsync("/api/v1/chaos/inject", payload);
+            using var response = await Api.PostAsJsonAsync("/api/v1/chaos/inject", payload);
             if (response.IsSuccessStatusCode)
             {
                 var outcome = faultType == "None" ? "fault cleared" : $"{faultType} enabled";
@@ -86,12 +105,13 @@
             }
             else
             {
-                _consoleLogMessage = $"Command failed ({(int)response.StatusCode} {response.StatusCode}).";
+                _consoleLogMessage = OperatorMessages.For(response.StatusCode, action);
             }
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
-            _consoleLogMessage = "Could not reach the Stria.API API. Check that the host is running.";
+            Logger.LogWarning(ex, "Fault command to {Service} failed.", targetService);
+            _consoleLogMessage = OperatorMessages.For(ex.StatusCode, action);
         }
         finally
         {
