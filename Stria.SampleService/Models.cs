@@ -14,6 +14,9 @@ public sealed class StriaOptions
 
     /// <summary>Cap on requests parked in an injected delay at once, so a fault can't exhaust the process.</summary>
     public int MaxConcurrentDelayed { get; set; } = 500;
+
+    /// <summary>This service's data-plane key, sent as X-Stria-Service-Key. Never commit it.</summary>
+    public string ServiceKey { get; set; } = string.Empty;
 }
 
 /// <summary>

@@ -6,10 +6,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Fail fast on bad configuration instead of polling a nonsense URL forever.
 builder.Services.AddOptions<StriaOptions>()
     .Bind(builder.Configuration.GetSection(StriaOptions.SectionName))
-    .Validate(
+       .Validate(
         o => !string.IsNullOrWhiteSpace(o.ServiceName)
+             && !string.IsNullOrWhiteSpace(o.ServiceKey)
              && Uri.TryCreate(o.BaseUrl, UriKind.Absolute, out _),
-        "Stria:ServiceName and an absolute Stria:BaseUrl are required.")
+        "Stria:ServiceName, Stria:ServiceKey and an absolute Stria:BaseUrl are required.")
     .ValidateOnStart();
 
 builder.Services.AddSingleton(TimeProvider.System);
@@ -19,6 +20,7 @@ builder.Services.AddHttpClient("stria", (sp, client) =>
 {
     var options = sp.GetRequiredService<IOptions<StriaOptions>>().Value;
     client.BaseAddress = new Uri(options.BaseUrl);
+    client.DefaultRequestHeaders.Add("X-Stria-Service-Key", options.ServiceKey);
     // a slow control plane must not stall the poll loop
     client.Timeout = TimeSpan.FromSeconds(2);
 });

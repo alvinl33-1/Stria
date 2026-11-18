@@ -21,6 +21,8 @@ services:
       AzureAd__ClientSecret: "${STRIA_CLIENT_SECRET:?set STRIA_CLIENT_SECRET}"
       AzureAdApi__TenantId: "${STRIA_TENANT_ID}"
       AzureAdApi__ClientId: "${STRIA_CLIENT_ID}"
+      # Per-service data-plane keys: Stria gets only the SHA-256, the service gets the key.
+      DataPlane__ServiceKeyHashes__PaymentGateway: "${STRIA_PAYMENTGATEWAY_KEY_SHA256:?set STRIA_PAYMENTGATEWAY_KEY_SHA256}"
     depends_on:
       db:
         condition: service_healthy
@@ -50,6 +52,7 @@ services:
     environment:
       Stria__BaseUrl: "http://stria-server:8080"
       Stria__ServiceName: "PaymentGateway"
+      Stria__ServiceKey: "${STRIA_PAYMENTGATEWAY_KEY:?set STRIA_PAYMENTGATEWAY_KEY}"
       Stria__PollIntervalMs: "1000"
     ports:
       - "127.0.0.1:8081:8080"

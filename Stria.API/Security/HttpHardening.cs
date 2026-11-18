@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
@@ -20,6 +21,9 @@ public sealed class ChaosRateLimitOptions
     public int MutatePermitLimit { get; set; } = 20;
 
     public int WindowSeconds { get; set; } = 60;
+
+    /// <summary>Directive polls per window per service. One poll/s is 60 per minute; the rest is headroom for replicas.</summary>
+    public int DataPlanePermitLimit { get; set; } = 240;
 }
 
 /// <summary>Request-size, rate-limit and response-header hardening for the Stria host.</summary>
@@ -27,6 +31,7 @@ public static class HttpHardening
 {
     public const string ReadPolicy = "chaos-read";
     public const string MutatePolicy = "chaos-mutate";
+    public const string DataPlanePolicy = "chaos-data-plane";
 
     /// <summary>Largest accepted request body on /api/v1/chaos. A fault request is well under 1 KB.</summary>
     public const long MaxChaosBodyBytes = 16 * 1024;
@@ -45,8 +50,13 @@ public static class HttpHardening
         return services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            options.AddPolicy(ReadPolicy, http => Partition(http, limits => limits.ReadPermitLimit));
-            options.AddPolicy(MutatePolicy, http => Partition(http, limits => limits.MutatePermitLimit));
+            options.AddPolicy(ReadPolicy, http =>
+                Partition(http, "user", http.User.GetObjectId(), limits => limits.ReadPermitLimit));
+            options.AddPolicy(MutatePolicy, http =>
+                Partition(http, "user", http.User.GetObjectId(), limits => limits.MutatePermitLimit));
+            options.AddPolicy(DataPlanePolicy, http =>
+                Partition(http, "service", http.User.FindFirstValue(DataPlaneDefaults.ServiceClaim),
+                    limits => limits.DataPlanePermitLimit));
             options.OnRejected = async (context, ct) =>
             {
                 var http = context.HttpContext;
@@ -66,15 +76,15 @@ public static class HttpHardening
     }
 
     /// <summary>
-    /// Partitions by authenticated object ID, falling back to the client IP. Must run after
-    /// UseAuthorization so HttpContext.User reflects the endpoint's schemes (bearer included).
+    /// Partitions by the authenticated caller (user object ID or service name), falling back to
+    /// the client IP. Must run after UseAuthorization so HttpContext.User reflects the endpoint's schemes.
     /// </summary>
-    private static RateLimitPartition<string> Partition(HttpContext http, Func<ChaosRateLimitOptions, int> permits)
+    private static RateLimitPartition<string> Partition(
+        HttpContext http, string kind, string? identity, Func<ChaosRateLimitOptions, int> permits)
     {
         var limits = http.RequestServices.GetRequiredService<IOptions<ChaosRateLimitOptions>>().Value;
-        var oid = http.User.GetObjectId();
-        var key = oid is not null
-            ? $"user:{oid}"
+        var key = identity is not null
+            ? $"{kind}:{identity}"
             : $"ip:{http.Connection.RemoteIpAddress?.ToString() ?? "unknown"}";
 
         return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions

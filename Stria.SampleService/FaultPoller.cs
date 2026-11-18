@@ -56,10 +56,16 @@ public sealed class FaultPoller : BackgroundService
         } while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 
+
     private async Task PollOnceAsync(string url, CancellationToken stoppingToken)
     {
         using var response = await _http.GetAsync(url, stoppingToken);
         FaultDirective? directive = null;
+
+        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            throw new HttpRequestException(
+                $"Stria rejected this service's data-plane key ({(int)response.StatusCode}); check Stria:ServiceKey.",
+                null, response.StatusCode);
 
         if (response.StatusCode != HttpStatusCode.NoContent)
         {
