@@ -17,4 +17,18 @@ public interface IChaosOrchestrator
     Task<IReadOnlyList<ChaosExperiment>> GetAllActiveFaultsAsync(CancellationToken cancellationToken = default);
 
     Task<int> ExpireDueFaultsAsync(CancellationToken cancellationToken = default);
+
+    Task<KillSwitchState> GetKillSwitchAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Clears every active experiment and suppresses new injections until released. Injections
+    /// while engaged throw <see cref="KillSwitchEngagedException"/>. Engaging when already
+    /// engaged changes nothing and records no event. <paramref name="actor"/> comes from the server.
+    /// </summary>
+    Task<KillSwitchState> EngageKillSwitchAsync(string reason, Actor actor,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Allows injections again. Releasing when already released changes nothing.</summary>
+    Task<KillSwitchState> ReleaseKillSwitchAsync(string reason, Actor actor,
+        CancellationToken cancellationToken = default);
 }

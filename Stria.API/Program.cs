@@ -329,12 +329,60 @@ api.MapPost("/chaos/inject", async (
                 title: "Caller has no stable identity.",
                 type: "about:blank");
 
-        await orchestrator.InjectFaultAsync(request, actor, ct);
+        try
+        {
+            await orchestrator.InjectFaultAsync(request, actor, ct);
+        }
+        catch (KillSwitchEngagedException)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Fault injection is suspended by the kill switch.",
+                type: "about:blank");
+        }
+
         return Results.Accepted("/api/v1/chaos/faults", request with { TriggeredBy = actor.Id });
     })
     .RequireAuthorization(ControlPlane(ChaosPolicies.Operate))
     .RequireRateLimiting(HttpHardening.MutatePolicy)
     .AddEndpointFilter<CookieAntiforgeryFilter>();
+
+// Global kill switch: everyone who can view sees its state; only admins change it.
+api.MapGet("/chaos/kill-switch", async (IChaosOrchestrator orchestrator, CancellationToken ct) =>
+        Results.Ok(await orchestrator.GetKillSwitchAsync(ct)))
+    .RequireAuthorization(ControlPlane(ChaosPolicies.View))
+    .RequireRateLimiting(HttpHardening.ReadPolicy);
+
+MapKillSwitchChange("/chaos/kill-switch/engage", (o, reason, actor, ct) => o.EngageKillSwitchAsync(reason, actor, ct));
+MapKillSwitchChange("/chaos/kill-switch/release", (o, reason, actor, ct) => o.ReleaseKillSwitchAsync(reason, actor, ct));
+
+void MapKillSwitchChange(
+    string pattern,
+    Func<IChaosOrchestrator, string, Actor, CancellationToken, Task<KillSwitchState>> change) =>
+    api.MapPost(pattern, async (
+            KillSwitchRequest request,
+            HttpContext http,
+            IChaosOrchestrator orchestrator,
+            CancellationToken ct) =>
+        {
+            if (!KillSwitchEvent.TryNormalizeReason(request.Reason, out var reason, out var error))
+                return Results.Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid kill switch request.",
+                    detail: error,
+                    type: "about:blank");
+
+            if (!ActorResolver.TryResolve(http.User, out var actor))
+                return Results.Problem(
+                    statusCode: StatusCodes.Status403Forbidden,
+                    title: "Caller has no stable identity.",
+                    type: "about:blank");
+
+            return Results.Ok(await change(orchestrator, reason, actor, ct));
+        })
+        .RequireAuthorization(ControlPlane(ChaosPolicies.Admin))
+        .RequireRateLimiting(HttpHardening.MutatePolicy)
+        .AddEndpointFilter<CookieAntiforgeryFilter>();
 
 // 4. MAP ROOT UI PATHS
 // Static assets are endpoints in .NET 10: MapStaticAssets serves _framework/blazor.web.js and the
