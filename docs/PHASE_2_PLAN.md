@@ -1,6 +1,7 @@
 # Stria Phase 2 Plan — Authorized Control Plane
 
-**Status:** In progress. Steps 0–4 are implemented. Step 5 (admin kill switch) is next.
+**Status:** In progress. Steps 0–4 are implemented and merged. Step 5 (admin kill switch) is next;
+see [PHASE_2_HANDOFF.md](PHASE_2_HANDOFF.md) for current state and where to start.
 
 **Scope guard:** Phase 2 is a security/identity phase. Do not provision Azure resources or
 incur subscription cost. Use a test Entra tenant or a local OIDC provider for development

@@ -81,7 +81,7 @@ dotnet test Stria.sln --configuration Release --no-build
 
 Configure `main` branch protection to require `build-and-test`, `dependency-audit`, and `container-build`. The `dependency-review` job starts running when the repository is public; private repositories need GitHub Advanced Security for it, so do not require it while the repository is private. Administrators can bypass these rules; do not use that bypass for normal changes.
 
-The Phase 2 security plan is in [docs/PHASE_2_PLAN.md](docs/PHASE_2_PLAN.md).
+The Phase 2 security plan is in [docs/PHASE_2_PLAN.md](docs/PHASE_2_PLAN.md); current progress and next steps are in [docs/PHASE_2_HANDOFF.md](docs/PHASE_2_HANDOFF.md).
 
 ## Authentication
 
