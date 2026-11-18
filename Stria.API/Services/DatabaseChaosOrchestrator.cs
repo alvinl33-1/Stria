@@ -148,7 +148,10 @@ public class DatabaseChaosOrchestrator : IChaosOrchestrator
             return KillSwitchState.From(latest);
         }
 
-        DateTime now = _time.GetUtcNow().UtcDateTime;
+        // PostgreSQL stores microseconds; truncate so the state we return equals what is persisted
+        // (Linux clocks carry 100 ns ticks, which would otherwise differ after a read-back).
+        var utcNow = _time.GetUtcNow().UtcDateTime;
+        DateTime now = utcNow.AddTicks(-(utcNow.Ticks % TimeSpan.TicksPerMicrosecond));
         DateTime? clearedAt = now;
         var cleared = 0;
 
