@@ -1,6 +1,6 @@
 # Stria Phase 2 Plan — Authorized Control Plane
 
-**Status:** In progress. Steps 0–4 are implemented and merged. Step 5 (admin kill switch) is next;
+**Status:** In progress. Steps 0–5 are implemented. Step 6 (verification and handoff) is next;
 see [PHASE_2_HANDOFF.md](PHASE_2_HANDOFF.md) for current state and where to start.
 
 **Scope guard:** Phase 2 is a security/identity phase. Do not provision Azure resources or
@@ -255,7 +255,7 @@ is configured. Plain SHA-256 is enough because keys are 32 random bytes. Phase 3
 scheme with Entra workload identity without changing the route. `DataPlaneSecurityTests` covers
 the data-plane rows of the test matrix.
 
-### Step 5 — Admin kill switch
+### Step 5 — Admin kill switch (implemented)
 
 - Add persistence, orchestrator enforcement, admin endpoints, and dashboard state.
 - Clear active experiments on engage and suppress new injections.
@@ -263,6 +263,18 @@ the data-plane rows of the test matrix.
 
 **Acceptance:** an admin can stop all fault injection immediately, and no operator or data-plane
 credential can engage or release the switch.
+
+**As built:** an append-only `KillSwitchEvents` table; the latest row is the current state and the
+table is the audit history (actor, display name, reason, time, experiments cleared). Engage clears
+active experiments as `system:kill-switch` (leases that had already run out stay `system:expiry`).
+`DatabaseChaosOrchestrator` enforces the switch, not just the endpoint: every injection takes a
+shared PostgreSQL advisory lock and reads the switch in its transaction, and engage/release take
+the same lock exclusively, so no injection can commit after an engage. Clearing (`None`) stays
+allowed while engaged. Engage and release return `200` with the new state, need a reason
+(1–500 characters), and do nothing when the switch is already in that state. The dashboard shows a
+banner to every viewer while engaged and the controls only to `ChaosAdmin`.
+`KillSwitchApiTests` and `KillSwitchOrchestratorTests` cover the matrix column, `409`
+suppression, clearing, release, expiry interaction and an engage-versus-injection race.
 
 ### Step 6 — Verification and handoff
 
@@ -280,7 +292,7 @@ credential can engage or release the switch.
 | Anonymous | `401` | `401` | `401` | `401` |
 | `ChaosViewer` | `200` | `403` | `401` | `403` |
 | `ChaosOperator` | `200` | `202` | `401` | `403` |
-| `ChaosAdmin` | `200` | `202` | `401` | `202`/`200` |
+| `ChaosAdmin` | `200` | `202` | `401` | `200` |
 | Data plane for its own service | `401` | `401` | `200`/`204` | `401` |
 | Data plane for another service | `401` | `401` | `403` | `401` |
 | Expired/wrong-audience JWT | `401` | `401` | `401` | `401` |
@@ -309,9 +321,9 @@ Add separate cases for rate limits (`429`), oversized bodies (`413`), missing an
 
 - [x] CI fails on formatting, build warnings, vulnerable packages, or broken images.
 - [x] Anonymous control-plane and directive requests are rejected.
-- [ ] Viewers cannot mutate; operators cannot administer the kill switch.
+- [x] Viewers cannot mutate; operators cannot administer the kill switch.
 - [x] Actor IDs come from validated claims and are covered by tests.
 - [x] Data-plane credentials are service-scoped and cannot be used on control routes.
 - [x] Rate limits, request-size limits, and CSRF protection are tested.
-- [ ] Kill switch clears and suppresses faults, with audit history.
+- [x] Kill switch clears and suppresses faults, with audit history.
 - [ ] README and handoff document the auth setup, required CI checks, and Phase 2 evidence.
