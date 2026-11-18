@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Stria.Client.Security;
 using Stria.Client.Services;
 using Stria.DTOs;
@@ -114,7 +115,22 @@ public sealed class HardeningTests
         Assert.AreEqual("strict-origin-when-cross-origin", response.Headers.GetValues("Referrer-Policy").Single());
         Assert.IsTrue(response.Headers.Contains("Permissions-Policy"));
         StringAssert.Contains(
-            response.Headers.GetValues("Content-Security-Policy-Report-Only").Single(),
+            response.Headers.GetValues("Content-Security-Policy").Single(),
             "frame-ancestors 'none'");
+        Assert.IsFalse(response.Headers.Contains("Content-Security-Policy-Report-Only"));
+    }
+
+    [TestMethod]
+    public async Task Page_ImportMapCarriesTheResponseCspNonce()
+    {
+        // Enforced CSP blocks inline scripts; Blazor's import map is one, admitted only by nonce.
+        using var client = _host.CreateClient();
+        var first = await client.GetAsync("/access-denied");
+        var second = await client.GetAsync("/access-denied");
+
+        var nonce = Regex.Match(first.Headers.GetValues("Content-Security-Policy").Single(), "'nonce-([^']+)'").Groups[1].Value;
+        Assert.IsFalse(string.IsNullOrEmpty(nonce));
+        StringAssert.Contains(await first.Content.ReadAsStringAsync(), $"<script type=\"importmap\" nonce=\"{nonce}\"");
+        Assert.IsFalse(second.Headers.GetValues("Content-Security-Policy").Single().Contains(nonce), "Nonce must be per request.");
     }
 }

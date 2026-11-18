@@ -1,4 +1,5 @@
-﻿<!DOCTYPE html>
+﻿@using Stria.Security
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -9,7 +10,7 @@
     <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]"/>
     <link rel="stylesheet" href="@Assets["app.css"]"/>
     <link rel="stylesheet" href="@Assets["Stria.styles.css"]"/>
-    <ImportMap/>
+    <ImportMap nonce="@HttpHardening.GetCspNonce(HttpContext)"/>
     <link rel="icon" type="image/png" href="favicon.png"/>
     <HeadOutlet @rendermode="InteractiveWebAssembly"/>
 </head>
@@ -20,3 +21,8 @@
 </body>
 
 </html>
+
+@code {
+    // Static server rendering, so the request's HttpContext is available to read the CSP nonce.
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = null!;
+}

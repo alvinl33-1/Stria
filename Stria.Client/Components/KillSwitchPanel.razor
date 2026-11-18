@@ -15,8 +15,8 @@
             @if (engaged.ChangedAt is DateTime at)
             {
                 <span> at @at.ToLocalTime().ToString("g")</span>
-            }
-            : <q>@engaged.Reason</q>
+            }.
+            <br />Reason: <q>@engaged.Reason</q>
         </p>
         <AuthorizeView Policy="@ChaosPolicies.Admin">
             <div class="kill-switch-form">
