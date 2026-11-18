@@ -64,3 +64,19 @@ application granted the `ChaosOperator` app role can use the client-credentials 
 - Viewer: the faults table is visible but no inject/clear buttons; a `POST` to
   `/api/v1/chaos/inject` returns `403`.
 - Operator: inject and clear work; the stored `TriggeredBy` is your object ID.
+
+## 5. Troubleshooting
+
+- **Roles changed but Stria still shows the old access.** Roles are read once, at sign-in, and
+  kept in the Stria cookie. Sign out of Stria (or use a private window) and sign in again.
+- **"Access denied" page after signing in.** The server found no Stria role in your sign-in.
+  Check **Enterprise applications → Stria (local) → Users and groups** for an assignment to the
+  same account you signed in with (`GET /api/v1/me` shows its object ID), then sign in again.
+- **The portal won't assign a role.** The user already holds that role (Entra rejects duplicate
+  assignments), or the role's **Allowed member types** excludes users.
+- **Entra error page with an `AADSTS…` code.** Entra blocked the sign-in before it reached Stria:
+  `AADSTS50105` means the user has no assignment while **Assignment required** is on;
+  `AADSTS50011` means the redirect URI is not registered.
+- **Seeing the authorization decision.** Set
+  `Logging__LogLevel__Microsoft.AspNetCore.Authorization=Debug` on the Stria container; failures
+  log the role requirement that was not met. Remove it afterwards.
