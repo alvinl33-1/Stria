@@ -39,11 +39,12 @@ public sealed class PostgresFixture : IAsyncDisposable
         await db.Database.MigrateAsync();
     }
 
-    /// <summary>Removes all experiment rows so each test starts from a known state.</summary>
+    /// <summary>Removes all experiment and kill-switch rows so each test starts from a known state.</summary>
     public async Task ResetAsync()
     {
         await using var db = await ContextFactory.CreateDbContextAsync();
         await db.ChaosExperiments.ExecuteDeleteAsync();
+        await db.KillSwitchEvents.ExecuteDeleteAsync();
     }
 
     public async ValueTask DisposeAsync() => await _container.DisposeAsync();

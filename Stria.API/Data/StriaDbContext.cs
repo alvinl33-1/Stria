@@ -13,6 +13,7 @@ public class StriaDbContext : DbContext
     }
 
     public DbSet<ChaosExperiment> ChaosExperiments => Set<ChaosExperiment>();
+    public DbSet<KillSwitchEvent> KillSwitchEvents => Set<KillSwitchEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -66,6 +67,24 @@ public class StriaDbContext : DbContext
 
             // Supports the retention sweep (Status = Cleared AND ClearedAt < cutoff).
             e.HasIndex(x => x.ClearedAt);
+        });
+
+        modelBuilder.Entity<KillSwitchEvent>(e =>
+        {
+            e.ToTable("KillSwitchEvents", t =>
+            {
+                t.HasCheckConstraint("ck_kill_switch_events_reason", "btrim(\"Reason\") <> ''");
+                t.HasCheckConstraint(
+                    "ck_kill_switch_events_cleared",
+                    "\"ClearedExperiments\" >= 0 AND (\"Engaged\" OR \"ClearedExperiments\" = 0)");
+            });
+
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).UseIdentityAlwaysColumn();
+            e.Property(x => x.Actor).IsRequired().HasMaxLength(ChaosRules.MaxTriggeredByLength);
+            e.Property(x => x.ActorName).HasMaxLength(Actor.MaxDisplayNameLength);
+            e.Property(x => x.Reason).IsRequired().HasMaxLength(KillSwitchEvent.MaxReasonLength);
+            e.Property(x => x.OccurredAt).HasColumnType("timestamp with time zone");
         });
     }
 }

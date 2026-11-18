@@ -12,6 +12,7 @@ public static class OperatorMessages
     {
         HttpStatusCode.Unauthorized => "Your session has ended. Reload the page to sign in again.",
         HttpStatusCode.Forbidden => $"You don't have permission to {action}.",
+        HttpStatusCode.Conflict => "Fault injection is suspended by the kill switch.",
         HttpStatusCode.TooManyRequests => "Too many requests. Wait a moment and try again.",
         HttpStatusCode.BadRequest => $"The request to {action} was rejected. Reload the page and try again.",
         _ => $"Could not {action}. Try again shortly."

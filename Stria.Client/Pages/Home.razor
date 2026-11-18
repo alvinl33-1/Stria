@@ -18,6 +18,8 @@
         <p>Introduce a controlled fault to test how dependent systems respond. Changes take effect immediately.</p>
     </section>
 
+    <KillSwitchPanel EngagedChanged="engaged => _killSwitchEngaged = engaged" />
+
     <section class="service-grid" aria-label="Service fault controls">
         <article class="service-panel">
             <div class="service-index">01 <span>PAYMENTS</span></div>
@@ -26,7 +28,7 @@
             <AuthorizeView Policy="@ChaosPolicies.Operate">
                 <Authorized>
                     <div class="service-actions">
-                        <button class="action-button action-warn" disabled="@_isSubmitting" @onclick='() => CommitChaos("PaymentGateway", "Latency")'>Inject latency <span>↗</span></button>
+                        <button class="action-button action-warn" disabled="@(_isSubmitting || _killSwitchEngaged)" @onclick='() => CommitChaos("PaymentGateway", "Latency")'>Inject latency <span>↗</span></button>
                         <button class="clear-button" disabled="@_isSubmitting" @onclick='() => CommitChaos("PaymentGateway", "None")'>Clear fault</button>
                     </div>
                 </Authorized>
@@ -40,7 +42,7 @@
             <AuthorizeView Policy="@ChaosPolicies.Operate">
                 <Authorized>
                     <div class="service-actions">
-                        <button class="action-button action-danger" disabled="@_isSubmitting" @onclick='() => CommitChaos("AuthService", "HttpFailure")'>Inject HTTP 503 <span>↗</span></button>
+                        <button class="action-button action-danger" disabled="@(_isSubmitting || _killSwitchEngaged)" @onclick='() => CommitChaos("AuthService", "HttpFailure")'>Inject HTTP 503 <span>↗</span></button>
                         <button class="clear-button" disabled="@_isSubmitting" @onclick='() => CommitChaos("AuthService", "None")'>Clear fault</button>
                     </div>
                 </Authorized>
@@ -81,6 +83,7 @@
 @code {
     private string? _consoleLogMessage;
     private bool _isSubmitting;
+    private bool _killSwitchEngaged; // inject buttons only; clearing stays allowed while engaged
 
     // The server derives the actor from the signed-in user, so no TriggeredBy is sent.
     private sealed record FaultInjectionRequest(string TargetService, string FaultType, int? LatencyMs = null);

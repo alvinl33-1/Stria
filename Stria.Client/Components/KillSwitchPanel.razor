@@ -1,0 +1,166 @@
+@implements IAsyncDisposable
+@inject HttpClient Http
+@inject ChaosApiClient Api
+@inject ILogger<KillSwitchPanel> Logger
+
+@if (_state is { Engaged: true } engaged)
+{
+    <section class="kill-switch-banner" role="alert">
+        <div class="kill-switch-heading">
+            <span class="kill-switch-dot"></span> KILL SWITCH ENGAGED
+        </div>
+        <p>
+            All fault injection is suspended and active faults were cleared.
+            Engaged by <strong>@(engaged.ChangedByName ?? engaged.ChangedBy)</strong>
+            @if (engaged.ChangedAt is DateTime at)
+            {
+                <span> at @at.ToLocalTime().ToString("g")</span>
+            }
+            : <q>@engaged.Reason</q>
+        </p>
+        <AuthorizeView Policy="@ChaosPolicies.Admin">
+            <div class="kill-switch-form">
+                <label for="kill-switch-reason" class="visually-hidden">Reason for release</label>
+                <input id="kill-switch-reason" @bind="_reason" @bind:event="oninput"
+                       maxlength="@MaxReasonLength" placeholder="Reason for release" />
+                <button class="kill-switch-release" disabled="@(_isSubmitting || string.IsNullOrWhiteSpace(_reason))"
+                        @onclick="() => Change(engage: false)">Release</button>
+            </div>
+        </AuthorizeView>
+    </section>
+}
+else
+{
+    <AuthorizeView Policy="@ChaosPolicies.Admin">
+        <section class="kill-switch-admin" aria-label="Kill switch">
+            <div>
+                <div class="kill-switch-label">GLOBAL KILL SWITCH</div>
+                <p>Clears every active fault and blocks new injections until released.</p>
+            </div>
+            <div class="kill-switch-form">
+                <label for="kill-switch-reason" class="visually-hidden">Reason for engaging</label>
+                <input id="kill-switch-reason" @bind="_reason" @bind:event="oninput"
+                       maxlength="@MaxReasonLength" placeholder="Reason (required)" />
+                <button class="kill-switch-engage" disabled="@(_isSubmitting || _state is null || string.IsNullOrWhiteSpace(_reason))"
+                        @onclick="() => Change(engage: true)">Engage</button>
+            </div>
+        </section>
+    </AuthorizeView>
+}
+
+@if (!string.IsNullOrEmpty(_message))
+{
+    <p class="kill-switch-message" role="status">@_message</p>
+}
+
+@code {
+    // Mirrors KillSwitchEvent.MaxReasonLength on the server, which enforces it.
+    private const int MaxReasonLength = 500;
+
+    private readonly CancellationTokenSource _pollCancellation = new();
+    private KillSwitchState? _state;
+    private string? _reason;
+    private string? _message;
+    private bool _isSubmitting;
+    private Task? _pollTask;
+
+    /// <summary>Raised when the engaged state changes, so the page can disable injection controls.</summary>
+    [Parameter] public EventCallback<bool> EngagedChanged { get; set; }
+
+    private sealed record KillSwitchState(bool Engaged, DateTime? ChangedAt, string? ChangedBy, string? ChangedByName, string? Reason);
+    private sealed record KillSwitchRequest(string Reason);
+
+    // As in ActiveFaultsTable: poll only once interactive, never during prerendering.
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+            _pollTask = Poll();
+    }
+
+    private async Task Poll()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
+        try
+        {
+            do
+            {
+                await Refresh();
+                if (!await timer.WaitForNextTickAsync(_pollCancellation.Token))
+                    break;
+            } while (!_pollCancellation.IsCancellationRequested);
+        }
+        catch (OperationCanceledException) when (_pollCancellation.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async Task Refresh()
+    {
+        try
+        {
+            var state = await Http.GetFromJsonAsync<KillSwitchState>("/api/v1/chaos/kill-switch", _pollCancellation.Token);
+            await Apply(state);
+        }
+        catch (OperationCanceledException) when (_pollCancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            // Keep the last known state: hiding the banner because a poll failed would be misleading.
+            Logger.LogWarning(ex, "Loading kill switch state failed.");
+        }
+    }
+
+    private async Task Apply(KillSwitchState? state)
+    {
+        var wasEngaged = _state?.Engaged ?? false;
+        _state = state;
+        if ((state?.Engaged ?? false) != wasEngaged)
+            await EngagedChanged.InvokeAsync(state?.Engaged ?? false);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task Change(bool engage)
+    {
+        if (_isSubmitting || string.IsNullOrWhiteSpace(_reason))
+            return;
+
+        _isSubmitting = true;
+        var action = engage ? "engage the kill switch" : "release the kill switch";
+        try
+        {
+            var url = engage ? "/api/v1/chaos/kill-switch/engage" : "/api/v1/chaos/kill-switch/release";
+            using var response = await Api.PostAsJsonAsync(url, new KillSwitchRequest(_reason.Trim()), _pollCancellation.Token);
+            if (response.IsSuccessStatusCode)
+            {
+                _reason = null;
+                _message = null;
+                await Apply(await response.Content.ReadFromJsonAsync<KillSwitchState>(_pollCancellation.Token));
+            }
+            else
+            {
+                _message = OperatorMessages.For(response.StatusCode, action);
+            }
+        }
+        catch (OperationCanceledException) when (_pollCancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Kill switch change failed.");
+            _message = OperatorMessages.For((ex as HttpRequestException)?.StatusCode, action);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _pollCancellation.CancelAsync();
+        if (_pollTask is not null)
+            await _pollTask;
+        _pollCancellation.Dispose();
+    }
+}

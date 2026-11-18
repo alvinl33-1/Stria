@@ -17,7 +17,7 @@ namespace Stria.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.14")
+                .HasAnnotation("ProductVersion", "10.0.15")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -97,6 +97,47 @@ namespace Stria.Data.Migrations
                             t.HasCheckConstraint("ck_chaos_experiments_percent", "\"Percent\" BETWEEN 1 AND 100");
 
                             t.HasCheckConstraint("ck_chaos_experiments_status_code", "(\"FaultType\" = 'HttpFailure' AND \"StatusCode\" IS NOT NULL AND \"StatusCode\" BETWEEN 500 AND 599) OR (\"FaultType\" <> 'HttpFailure' AND \"StatusCode\" IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Stria.Domain.KillSwitchEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("ActorName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("ClearedExperiments")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("Engaged")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("KillSwitchEvents", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_kill_switch_events_cleared", "\"ClearedExperiments\" >= 0 AND (\"Engaged\" OR \"ClearedExperiments\" = 0)");
+
+                            t.HasCheckConstraint("ck_kill_switch_events_reason", "btrim(\"Reason\") <> ''");
                         });
                 });
 #pragma warning restore 612, 618
