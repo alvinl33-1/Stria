@@ -2,8 +2,10 @@
 
 **As of:** 2026-11-18. **Status:** Phase 2 is complete. Every step in
 [PHASE_2_PLAN.md](PHASE_2_PLAN.md) is merged: PR #14 (Steps 0–3), PR #15 (Step 4), PR #20 (Step 5),
-and the Step 6 verification PR. **Next:** Phase 3, deployment to Azure Container Apps. It needs
-explicit authorization because it creates paid resources.
+PR #21 (Step 6). `main` requires `build-and-test`, `dependency-audit`, `dependency-review` and
+`container-build`. **Next:** Phase 3, deployment to Azure Container Apps; see
+[PHASE_3_PLAN.md](PHASE_3_PLAN.md). Its first three steps need no Azure account; provisioning
+needs explicit authorization because it creates paid resources.
 
 **Scope guard (held):** Phase 2 created no Azure resources. Entra work used the free test tenant.
 
@@ -50,9 +52,10 @@ Each objective in [PHASE_2_PLAN.md §1](PHASE_2_PLAN.md#1-objective), and where 
 | Browser hardening | `HardeningTests` (enforced CSP, nonce on the import map, nonce per request) | Dashboard under the enforced CSP: no console messages through inject, engage, release |
 | No secrets in logs or error bodies | — | Compose logs (default level, then Debug auth logging) contain none of the DB password, client secret, data-plane key or its hash, and no rejected key. Error bodies are empty or generic; `/readyz` with the DB down is `503` with a trace ID only |
 
-**Not hand-checked:** the operator and viewer dashboard views after Step 5 (tests cover the server
-side, and the UI uses the same `AuthorizeView` policies as before), and sign-out under the enforced
-CSP (`form-action` allows the Entra redirect).
+**Sign-out under the enforced CSP** (checked after PR #21 merged): the form post reaches Entra's
+logout page, and the next request to `/` gets `302` to sign-in, so Stria's cookie is gone. A
+personal Microsoft account is then signed back in silently because Microsoft keeps its own session;
+use a private window to switch accounts.
 
 ## Threat model: what Phase 2 leaves for later
 
@@ -111,6 +114,7 @@ CSP (`form-action` allows the Entra redirect).
 
 ## Next: Phase 3
 
-Phase 3 deploys to Azure Container Apps and needs explicit authorization before any resource is
-created. The repository skills `compose-to-container-apps`, `dotnet-azure-runtime` and
-`azd-deployment` cover the mapping. Start with the threat-model rows owned by Phase 3 above.
+[PHASE_3_PLAN.md](PHASE_3_PLAN.md) has the objective, Compose-to-Azure mapping, work breakdown and
+the decisions needed before provisioning. Start with Step 1 (cloud-ready code, no Azure needed).
+The repository skills `compose-to-container-apps`, `dotnet-azure-runtime` and `azd-deployment`
+cover the details. The threat-model rows owned by Phase 3 above are its inputs.
