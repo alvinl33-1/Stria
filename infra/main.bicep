@@ -15,6 +15,16 @@ var tags = {
   'azd-env-name': environmentName
   project: 'stria'
 }
+
+@description('Entra tenant that signs users in (the test tenant). Not secret.')
+param entraTenantId string = ''
+@description('Client ID of the Stria app registration. Not secret.')
+param entraClientId string = ''
+@description('Image tag for all three images: sha-<commit> from CI (Sprint 2). Never latest.')
+param imageTag string = ''
+@description('False on the first provision: the apps need images in ACR and secrets in Key Vault first (Sprint 4).')
+param deployApps bool = false
+
 // Registry, vault and storage names are global DNS names. uniqueString is deterministic, so the
 // same resource group always gets the same names and redeploying never creates duplicates.
 var suffix = uniqueString(resourceGroup().id)
@@ -68,11 +78,88 @@ module storage 'modules/storage.bicep' = {
     appPrincipalId: identity.outputs.principalId
   }
 }
+module postgres 'modules/postgres.bicep' = {
+  name: 'postgres'
+  params: {
+    name: 'psql-stria-${suffix}'
+    location: location
+    tags: tags
+  }
+}
+
+module environment 'modules/environment.bicep' = {
+  name: 'environment'
+  params: {
+    name: 'cae-stria-${environmentName}'
+    location: location
+    tags: tags
+    workspaceName: monitoring.outputs.workspaceName
+  }
+}
+
+// No password: Username is the identity's PostgreSQL role, and the token is the password.
+// VerifyFull checks the server certificate and host name, because that token is a bearer credential.
+var connectionString = 'Host=${postgres.outputs.fqdn};Port=5432;Database=${postgres.outputs.databaseName};Username=${identity.outputs.name};Ssl Mode=VerifyFull'
+
+module server 'modules/server.bicep' = if (deployApps) {
+  name: 'server'
+  params: {
+    name: 'stria-server'
+    location: location
+    tags: tags
+    environmentId: environment.outputs.id
+    identityId: identity.outputs.id
+    identityClientId: identity.outputs.clientId
+    registryServer: registry.outputs.loginServer
+    image: '${registry.outputs.loginServer}/stria-api:${imageTag}'
+    keyVaultUri: keyVault.outputs.uri
+    connectionString: connectionString
+    dataProtectionBlobUri: storage.outputs.dataProtectionBlobUri
+    dataProtectionKeyVaultKeyUri: keyVault.outputs.dataProtectionKeyUri
+    entraTenantId: entraTenantId
+    entraClientId: entraClientId
+    appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
+  }
+}
+
+module sample 'modules/sample.bicep' = if (deployApps) {
+  name: 'sample'
+  params: {
+    name: 'sample-payment-gateway'
+    location: location
+    tags: tags
+    environmentId: environment.outputs.id
+    identityId: identity.outputs.id
+    registryServer: registry.outputs.loginServer
+    image: '${registry.outputs.loginServer}/stria-sample:${imageTag}'
+    keyVaultUri: keyVault.outputs.uri
+    striaBaseUrl: 'https://${server!.outputs.fqdn}'
+  }
+}
+
+module migrate 'modules/migrate.bicep' = if (deployApps) {
+  name: 'migrate'
+  params: {
+    name: 'stria-migrate'
+    location: location
+    tags: tags
+    environmentId: environment.outputs.id
+    identityId: identity.outputs.id
+    identityClientId: identity.outputs.clientId
+    registryServer: registry.outputs.loginServer
+    image: '${registry.outputs.loginServer}/stria-migrator:${imageTag}'
+    connectionString: connectionString
+  }
+}
 
 // Upper-case outputs become azd environment values (Sprint 4 setup and Sprint 5 deploy read them).
 output AZURE_CONTAINER_REGISTRY_ENDPOINT string = registry.outputs.loginServer
 output AZURE_KEY_VAULT_NAME string = keyVault.outputs.name
 output AZURE_MANAGED_IDENTITY_CLIENT_ID string = identity.outputs.clientId
+output POSTGRES_SERVER_NAME string = postgres.outputs.name
+output POSTGRES_HOST string = postgres.outputs.fqdn
+output STRIA_SERVER_URL string = deployApps ? 'https://${server!.outputs.fqdn}' : ''
+output STRIA_MIGRATE_JOB_NAME string = deployApps ? migrate!.outputs.name : ''
 // Consumed by the container app modules in ticket 3.2. They map one-to-one onto the Sprint 1
 // settings (PHASE_3_PLAN.md, Step 1 table).
 output identityId string = identity.outputs.id
