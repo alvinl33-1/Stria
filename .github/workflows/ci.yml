@@ -144,13 +144,26 @@ jobs:
   container-build:
     name: container-build
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
+    permissions:
+      contents: read
+      security-events: write # Trivy SARIF to code scanning (uploaded from main only)
+    env:
+      # Immutable release tag. Never `latest`: a deploy must name the exact commit it runs.
+      IMAGE_TAG: sha-${{ github.sha }}
+      # Azure Container Apps runs amd64. Set explicitly so the build never follows the host.
+      IMAGE_PLATFORM: linux/amd64
+      # Pinned by digest, not tag: Trivy's release channels were compromised in March 2026.
+      TRIVY_IMAGE: aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Build control-plane image
-        run: docker build --file Stria.API/Dockerfile --tag stria-api:ci .
+        run: >
+          docker build --platform "$IMAGE_PLATFORM" --file Stria.API/Dockerfile
+          --label "org.opencontainers.image.revision=$GITHUB_SHA"
+          --tag "stria-api:$IMAGE_TAG" .
 
       # The image can differ from the local build (a restore-before-copy Dockerfile once dropped
       # _framework/blazor.web.js). Start it as Production with placeholder identity settings
@@ -168,7 +181,7 @@ jobs:
             -e AzureAdApi__TenantId=00000000-0000-0000-0000-000000000001 \
             -e AzureAdApi__ClientId=00000000-0000-0000-0000-000000000002 \
             -e DataPlane__ServiceKeyHashes__PaymentGateway=0000000000000000000000000000000000000000000000000000000000000000 \
-            stria-api:ci
+            "stria-api:$IMAGE_TAG"
           for i in $(seq 1 30); do curl -sf http://localhost:18080/healthz >/dev/null && break; sleep 1; done
           asset=$(curl -sf http://localhost:18080/access-denied | grep -o '_framework/blazor\.web\.[a-z0-9]*\.js' | head -1)
           if [ -z "$asset" ]; then echo "::error::Page does not reference _framework/blazor.web.js"; docker logs stria-api-probe; exit 1; fi
@@ -179,8 +192,92 @@ jobs:
         if: always()
         run: docker rm -f stria-api-probe || true
 
+      # Same Dockerfile, `migrator` stage: the EF bundle the release job runs before each revision.
+      - name: Build migration-job image
+        run: >
+          docker build --platform "$IMAGE_PLATFORM" --file Stria.API/Dockerfile --target migrator
+          --label "org.opencontainers.image.revision=$GITHUB_SHA"
+          --tag "stria-migrator:$IMAGE_TAG" .
+
+      # The bundle must bring an empty database to the latest migration, and a second run must be
+      # a no-op, as it will be on every release where the schema didn't change.
+      - name: Apply migrations with the bundle
+        run: |
+          docker network create stria-ci
+          docker run -d --name stria-ci-db --network stria-ci \
+            -e POSTGRES_DB=stria -e POSTGRES_USER=stria -e POSTGRES_PASSWORD=ci-only postgres:16
+          # Over TCP: the image's init phase answers on the Unix socket before the real server starts.
+          for i in $(seq 1 30); do docker exec stria-ci-db pg_isready -h 127.0.0.1 -U stria -d stria >/dev/null 2>&1 && break; sleep 1; done
+          migrate() {
+            docker run --rm --network stria-ci \
+              -e ConnectionStrings__Stria="Host=stria-ci-db;Database=stria;Username=stria;Password=ci-only" \
+              "stria-migrator:$IMAGE_TAG"
+          }
+          migrate
+          migrate
+          expected=$(find Stria.API/Data/Migrations -name '*_*.cs' ! -name '*.Designer.cs' | wc -l)
+          applied=$(docker exec stria-ci-db psql -h 127.0.0.1 -U stria -d stria -tAc 'SELECT count(*) FROM "__EFMigrationsHistory"')
+          if [ "$applied" -ne "$expected" ]; then echo "::error::Bundle applied $applied of $expected migrations"; exit 1; fi
+          echo "Bundle applied $applied of $expected migrations"
+
+      - name: Stop migration database
+        if: always()
+        run: |
+          docker rm -f stria-ci-db || true
+          docker network rm stria-ci || true
+
       - name: Build standalone dashboard image
-        run: docker build --file Stria.Client/Dockerfile --tag stria-client:ci .
+        run: >
+          docker build --platform "$IMAGE_PLATFORM" --file Stria.Client/Dockerfile
+          --label "org.opencontainers.image.revision=$GITHUB_SHA"
+          --tag "stria-client:$IMAGE_TAG" .
 
       - name: Build sample data-plane image
-        run: docker build --file Stria.SampleService/Dockerfile --tag stria-sample:ci .
+        run: >
+          docker build --platform "$IMAGE_PLATFORM" --file Stria.SampleService/Dockerfile
+          --label "org.opencontainers.image.revision=$GITHUB_SHA"
+          --tag "stria-sample:$IMAGE_TAG" .
+
+      - name: Check image tags and platform
+        run: |
+          for image in stria-api stria-migrator stria-client stria-sample; do
+            platform=$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$image:$IMAGE_TAG")
+            echo "$image:$IMAGE_TAG $platform"
+            [ "$platform" = "$IMAGE_PLATFORM" ] || { echo "::error::$image is $platform, expected $IMAGE_PLATFORM"; exit 1; }
+          done
+          if docker image ls --format '{{.Repository}}:{{.Tag}}' | grep -E '^stria-[a-z]+:latest$'; then
+            echo "::error::A stria image is tagged latest"; exit 1
+          fi
+
+      # Fails on HIGH/CRITICAL findings that have a fix. Unfixed ones can't be acted on here; the
+      # weekly Dockerfile updates pick up fixes as they ship. Accepted findings go in .trivyignore.
+      - name: Scan images with Trivy
+        run: |
+          mkdir -p "$RUNNER_TEMP/trivy-cache" trivy-results
+          trivy() {
+            docker run --rm -v "$RUNNER_TEMP/trivy-cache:/cache" -v "$PWD:/work" -w /work "$TRIVY_IMAGE" \
+              image --cache-dir /cache --ignorefile .trivyignore --severity HIGH,CRITICAL --ignore-unfixed "$@"
+          }
+          failed=()
+          for image in stria-api stria-migrator stria-client stria-sample; do
+            echo "== $image:$IMAGE_TAG"
+            docker save --output "$image.tar" "$image:$IMAGE_TAG"
+            trivy --input "$image.tar" --format sarif --output "trivy-results/$image.sarif"
+            trivy --input "$image.tar" --exit-code 1 || failed+=("$image")
+            rm "$image.tar"
+            # One code-scanning category per image, so their alerts don't replace each other.
+            jq --arg id "trivy/$image/" '.runs[].automationDetails.id = $id' "trivy-results/$image.sarif" > sarif.tmp
+            mv sarif.tmp "trivy-results/$image.sarif"
+          done
+          if [ ${#failed[@]} -gt 0 ]; then
+            echo "::error::Fixable HIGH/CRITICAL findings in: ${failed[*]}. Update the base image or package, or record an accepted finding in .trivyignore."
+            exit 1
+          fi
+
+      # PR runs are gated by the scan above; alerts are published from main only.
+      - name: Upload Trivy results to code scanning
+        if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && hashFiles('trivy-results/*.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: trivy-results
+  

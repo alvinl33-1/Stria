@@ -1,0 +1,6 @@
+# Accepted Trivy image findings, one ID per line, used by CI's "Scan images with Trivy" step.
+# Add an entry only when no fixed version exists or the finding is shown not to apply. Each needs
+# a comment above it: affected image, reason, who accepted it. Give it an expiry so it gets
+# re-checked, e.g.
+#   # stria-client: nginx module not loaded in our config (Alvin, 2026-11-19)
+#   CVE-0000-00000 exp:2027-02-01
