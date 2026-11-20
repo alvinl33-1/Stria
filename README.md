@@ -50,6 +50,15 @@ Compose starts PostgreSQL, waits for its health check, starts Stria, and starts 
 
 Stop the stack with `Ctrl+C`; use `docker compose down` to stop and remove the containers. The named `stria-pgdata` volume retains database contents when containers are removed, and `stria-dpkeys` retains Data Protection keys.
 
+Compose migrates on startup for convenience. Releases run the migrations bundle instead, as a separate job before the new revision starts; the same image works against the Compose database:
+
+```sh
+docker build --target migrator -f Stria.API/Dockerfile -t stria-migrator:local .
+docker run --rm --network stria_default \
+  -e ConnectionStrings__Stria="Host=db;Database=stria;Username=stria;Password=$STRIA_DB_PASSWORD" \
+  stria-migrator:local
+```
+
 For an automated smoke test of the running stack, run `scripts/compose-smoke.sh` from the repository root. It reads the sample service's key from `.env` and checks health, that anonymous callers get `401` on every control and directive route, data-plane key isolation, the enforced Content Security Policy, and that the image serves the Blazor script. It first waits up to 60 seconds for `/readyz` (set `STRIA_READY_TIMEOUT` to change this), so it can run straight after `docker compose up -d`. Signed-in flows need a browser.
 
 For a manual check, open the dashboard, inject bounded latency for `PaymentGateway`, and call `http://localhost:8081/work` repeatedly to observe the delay. Clear the fault and confirm the delay stops after the lease expires. The API process and database readiness endpoints should both return `200`:
@@ -68,7 +77,7 @@ GitHub Actions runs on pushes and pull requests to `main`:
 | `build-and-test` | Formatting is clean, the Release build has no warnings, all tests pass, and TRX/coverage evidence is uploaded |
 | `dependency-audit` | No known vulnerable direct or transitive NuGet packages are referenced |
 | `dependency-review` | A pull request does not introduce high-severity vulnerable dependencies (public repositories; private repositories need GitHub Advanced Security) |
-| `container-build` | The control-plane, standalone dashboard, and sample-service Dockerfiles still build, and the control-plane image starts in Production mode and serves the Blazor script its pages reference |
+| `container-build` | Builds the control-plane, migration-job, standalone dashboard and sample-service images for `linux/amd64`, tagged `sha-<commit>` (never `latest`). The control-plane image starts in Production mode and serves the Blazor script its pages reference; the migrations bundle brings an empty PostgreSQL to the latest migration and is a no-op on a second run; Trivy fails the job on fixable HIGH/CRITICAL findings in any image (accepted findings go in `.trivyignore`) |
 
 Integration tests use Testcontainers and PostgreSQL. CI sets `STRIA_REQUIRE_DOCKER_TESTS=true`, so the job fails rather than silently skipping PostgreSQL coverage when Docker cannot start. Dependabot checks NuGet packages, GitHub Actions, and Docker base images weekly.
 
@@ -83,7 +92,7 @@ dotnet test Stria.sln --configuration Release --no-build
 
 `main` branch protection requires `build-and-test`, `dependency-audit`, `dependency-review`, and `container-build`. `dependency-review` needs a public repository (or GitHub Advanced Security); drop it from the required checks if the repository becomes private. Administrators can bypass these rules; do not use that bypass for normal changes.
 
-The Phase 2 security plan is in [docs/PHASE_2_PLAN.md](docs/PHASE_2_PLAN.md); its evidence is in [docs/PHASE_2_HANDOFF.md](docs/PHASE_2_HANDOFF.md). Phase 3 (hosted demo on Azure Container Apps) is planned in [docs/PHASE_3_PLAN.md](docs/PHASE_3_PLAN.md).
+The Phase 2 security plan is in [docs/PHASE_2_PLAN.md](docs/PHASE_2_PLAN.md); its evidence is in [docs/PHASE_2_HANDOFF.md](docs/PHASE_2_HANDOFF.md). Phase 3 (hosted demo on Azure Container Apps) is planned in [docs/PHASE_3_PLAN.md](docs/PHASE_3_PLAN.md), with one figure per sprint in [docs/PHASE_3_SPRINTS.md](docs/PHASE_3_SPRINTS.md); the infrastructure is described, not yet provisioned, in `infra/`.
 
 ## Authentication
 

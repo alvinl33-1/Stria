@@ -1,32 +1,23 @@
 // Stria.API/Program.cs
 
-using System.Security.Claims;
 using Azure.Core;
 using Azure.Identity;
-using Microsoft.AspNetCore.Antiforgery;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authentication.OpenIdConnect;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Identity.Web;
-using Microsoft.IdentityModel.JsonWebTokens;
-using Microsoft.IdentityModel.Protocols.OpenIdConnect;
-using Npgsql;
-using Stria.Client.Security;
 using Stria.Client.Services;
 using Stria.Components;
 using Stria.Data;
-using Stria.Domain;
-using Stria.DTOs;
+using Stria.Endpoints;
 using Stria.Security;
 using Stria.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Refuse to start half-configured. Identity, data-plane keys, the Azure set and the database
+// settings are all checked here, before anything is registered.
+StartupValidation.ThrowIfInvalid(builder.Configuration, builder.Environment);
+
 builder.Services.AddProblemDetails();
 
 // Services
@@ -44,48 +35,11 @@ builder.Services.AddScoped(sp => new HttpClient
 });
 builder.Services.AddScoped<ChaosApiClient>();
 
-// Persistence. A DbContext *factory* (not a scoped DbContext) lets the singleton orchestrator
-// and the hosted services create a short-lived context per operation.
-var connectionString = builder.Configuration.GetConnectionString("Stria")
-    ?? throw new InvalidOperationException(
-        "Connection string 'Stria' is not configured. Set ConnectionStrings__Stria (never commit credentials).");
-
 // Azure resources (Blob, Key Vault, PostgreSQL) are reached with the container app's managed
 // identity. Created only if one of them is configured, so Compose and tests never build it.
 var azureCredential = new Lazy<TokenCredential>(() => new DefaultAzureCredential());
 
-// Identity settings. Outside Development a missing value stops startup instead of running with
-// broken sign-in. There is deliberately no switch that turns authentication off.
-if (!builder.Environment.IsDevelopment())
-{
-    string[] required =
-    [
-        "AzureAd:TenantId", "AzureAd:ClientId", "AzureAd:ClientSecret",
-        "AzureAdApi:TenantId", "AzureAdApi:ClientId"
-    ];
-    var missing = required.Where(key => string.IsNullOrWhiteSpace(builder.Configuration[key])).ToArray();
-    if (missing.Length > 0)
-        throw new InvalidOperationException(
-            $"Identity settings missing: {string.Join(", ", missing)}. Use user-secrets or environment variables.");
-
-    if (!builder.Configuration.GetSection("DataPlane:ServiceKeyHashes").GetChildren().Any())
-        throw new InvalidOperationException(
-            "DataPlane:ServiceKeyHashes has no entries, so no service could read its directives.");
-}
-
-// Azure settings, in every environment: a half-configured deployment must not start.
-var missingAzure = AzureRuntimeSettings.Missing(builder.Configuration);
-if (missingAzure.Count > 0)
-    throw new InvalidOperationException(
-        $"Azure settings incomplete: {string.Join(", ", missingAzure)}. Set all of them, or none for local use.");
-if (builder.Configuration.GetValue<bool>(StriaDataSource.UseEntraAuthKey) && AzureRuntimeSettings.HasPassword(connectionString))
-    throw new InvalidOperationException(
-        $"{StriaDataSource.UseEntraAuthKey} is on, so ConnectionStrings:Stria must not contain a password.");
-
-var dataSource = StriaDataSource.Create(
-    connectionString, builder.Configuration.GetValue<bool>(StriaDataSource.UseEntraAuthKey), azureCredential);
-builder.Services.AddSingleton(dataSource);
-builder.Services.AddDbContextFactory<StriaDbContext>(options => options.UseNpgsql(dataSource));
+builder.Services.AddStriaPersistence(builder.Configuration, azureCredential);
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.Configure<ExperimentRetentionOptions>(
     builder.Configuration.GetSection(ExperimentRetentionOptions.SectionName));
@@ -97,96 +51,8 @@ builder.Services.AddHostedService<ExperimentRetentionService>();
 builder.Services.AddHostedService<ExperimentExpiryService>();
 
 builder.Services.AddStriaDataProtection(builder.Configuration, azureCredential);
-
-// Authentication.
-//   Browser operators: OpenID Connect (authorization-code flow) + an encrypted cookie.
-//   Automation/CLI:    JWT bearer tokens issued for this API's audience.
-// Pages use the cookie by default. Every API route names its schemes explicitly instead of
-// relying on a default (see ControlPlane below).
-builder.Services.AddAuthentication(options =>
-    {
-        options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
-    })
-    .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"));
-builder.Services.AddAuthentication()
-    .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAdApi"), JwtBearerDefaults.AuthenticationScheme);
-
-// Data plane: polling services authenticate with their own key, never an operator credential.
-builder.Services.AddOptions<DataPlaneOptions>()
-    .Bind(builder.Configuration.GetSection(DataPlaneOptions.SectionName))
-    .Validate(DataPlaneKeys.IsValid,
-        "DataPlane:ServiceKeyHashes entries must name a registered service and hold a 64-character hex SHA-256.")
-    .ValidateOnStart();
-builder.Services.AddAuthentication()
-    .AddScheme<AuthenticationSchemeOptions, DataPlaneAuthenticationHandler>(
-        DataPlaneDefaults.AuthenticationScheme, configureOptions: null);
-builder.Services.AddSingleton<IAuthorizationHandler, OwnDirectiveHandler>();
-
-builder.Services.Configure<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme, options =>
-{
-    options.ResponseType = OpenIdConnectResponseType.Code;
-    options.MapInboundClaims = false; // keep Entra's short claim names ("oid", "roles", "name")
-    options.TokenValidationParameters.NameClaimType = "name";
-    options.TokenValidationParameters.RoleClaimType = "roles";
-
-    // An unauthenticated call to an /api route without explicit schemes must get 401, not a
-    // redirect to the Microsoft sign-in page.
-    var redirect = options.Events.OnRedirectToIdentityProvider;
-    options.Events.OnRedirectToIdentityProvider = ctx =>
-    {
-        if (!IsApi(ctx.Request))
-            return redirect(ctx);
-        ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
-        ctx.HandleResponse();
-        return Task.CompletedTask;
-    };
-});
-
-// Microsoft.Identity.Web installs its own JsonWebTokenHandler, and the MapInboundClaims setter
-// above only reaches the framework's default handlers. Turn mapping off on the handler that
-// actually validates the ID token; otherwise Entra's "roles" claim is renamed to ClaimTypes.Role,
-// RoleClaimType "roles" never matches, and every signed-in user is denied.
-builder.Services.PostConfigure<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme, options =>
-{
-    if (options.TokenHandler is JsonWebTokenHandler handler)
-        handler.MapInboundClaims = false;
-});
-
-builder.Services.Configure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
-{
-    options.MapInboundClaims = false;
-    options.TokenValidationParameters.NameClaimType = "name";
-    options.TokenValidationParameters.RoleClaimType = "roles";
-});
-
-builder.Services.PostConfigure<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme, options =>
-{
-    options.Cookie.HttpOnly = true;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-    options.Cookie.SameSite = SameSiteMode.Lax;
-    options.AccessDeniedPath = "/access-denied";
-
-    // API callers get status codes; only page requests are redirected.
-    var toLogin = options.Events.OnRedirectToLogin;
-    var toDenied = options.Events.OnRedirectToAccessDenied;
-    options.Events.OnRedirectToLogin = ctx =>
-        IsApi(ctx.Request) ? SetStatus(ctx.Response, StatusCodes.Status401Unauthorized) : toLogin(ctx);
-    options.Events.OnRedirectToAccessDenied = ctx =>
-        IsApi(ctx.Request) ? SetStatus(ctx.Response, StatusCodes.Status403Forbidden) : toDenied(ctx);
-});
-
-builder.Services.AddAuthorization(options =>
-{
-    ChaosPolicies.AddPolicies(options);
-    // Secure by default: an endpoint without its own authorization metadata still requires a
-    // signed-in user. Public endpoints opt out explicitly with AllowAnonymous().
-    options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
-    options.AddPolicy(DataPlaneDefaults.Policy, policy => policy
-        .AddAuthenticationSchemes(DataPlaneDefaults.AuthenticationScheme)
-        .RequireAuthenticatedUser()
-        .AddRequirements(new OwnDirectiveRequirement()));
-});
+builder.Services.AddStriaAuthentication(builder.Configuration);
+builder.Services.AddStriaAuthorization();
 
 // Cookie-authenticated JSON mutations send the antiforgery token in this header.
 builder.Services.AddAntiforgery(options => options.HeaderName = "X-XSRF-TOKEN");
@@ -252,175 +118,14 @@ app.UseRateLimiter();
 app.UseAntiforgery();
 app.UseStatusCodePages();
 
-app.MapGet("/healthz", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
-app.MapGet("/readyz", async (
-    IDbContextFactory<StriaDbContext> dbFactory,
-    ILogger<Program> logger,
-    CancellationToken ct) =>
-{
-    try
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db.Database.CanConnectAsync(ct)
-            ? Results.Ok(new { status = "ready" })
-            : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
-    }
-    catch (NpgsqlException ex)
-    {
-        logger.LogWarning(ex, "Readiness check could not connect to PostgreSQL.");
-        return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
-    }
-}).AllowAnonymous();
-
-// Browser sign-in/out. Sign-out is a POST so a cross-site link cannot log an operator out;
-// its form field binding makes UseAntiforgery() validate the token automatically.
-var authentication = app.MapGroup("/authentication");
-authentication.MapGet("/login", (string? returnUrl) => TypedResults.Challenge(
-        new AuthenticationProperties { RedirectUri = LocalUrl(returnUrl) },
-        [OpenIdConnectDefaults.AuthenticationScheme]))
-    .AllowAnonymous();
-authentication.MapPost("/logout", ([FromForm] string? returnUrl) => TypedResults.SignOut(
-    new AuthenticationProperties { RedirectUri = LocalUrl(returnUrl) },
-    [CookieAuthenticationDefaults.AuthenticationScheme, OpenIdConnectDefaults.AuthenticationScheme]));
-
+// 3. ENDPOINTS
+// Each module attaches its own authorization, rate-limit and antiforgery metadata; the
+// middleware above enforces it. Both API modules live under one versioned prefix.
+app.MapHealthEndpoints();
+app.MapAuthenticationEndpoints();
 var api = app.MapGroup("/api/v1");
-
-api.MapGet("/me", (ClaimsPrincipal user) => Results.Ok(new
-{
-    oid = user.GetObjectId(),
-    name = user.FindFirstValue("name")
-}))
-    .RequireAuthorization(ControlPlane(policy: null))
-    .RequireRateLimiting(HttpHardening.ReadPolicy);
-
-api.MapGet("/antiforgery/token", (IAntiforgery antiforgery, HttpContext http) =>
-    {
-        http.Response.Headers.CacheControl = "no-store";
-        return Results.Ok(new { token = antiforgery.GetAndStoreTokens(http).RequestToken });
-    })
-    .RequireAuthorization(ControlPlane(ChaosPolicies.View))
-    .RequireRateLimiting(HttpHardening.ReadPolicy);
-
-api.MapGet("/chaos/faults", async (IChaosOrchestrator orchestrator, CancellationToken ct) =>
-        Results.Ok(await orchestrator.GetAllActiveFaultsAsync(ct)))
-    .RequireAuthorization(ControlPlane(ChaosPolicies.View))
-    .RequireRateLimiting(HttpHardening.ReadPolicy);
-
-// Data-plane feed: what should service {service} be doing right now?
-//   200 + FaultDirective  -> apply it for RemainingSeconds
-//   204                   -> no active fault
-//   404                   -> not a registered service
-// Requires the calling service's own data-plane key: no key -> 401, another service's key -> 403.
-api.MapGet("/chaos/directives/{service}", async (
-    string service,
-    IChaosOrchestrator orchestrator,
-    TimeProvider time,
-    CancellationToken ct) =>
-{
-    if (!ChaosRules.TryGetService(service, out var canonical))
-        return Results.Problem(
-            statusCode: StatusCodes.Status404NotFound,
-            title: "Unknown target service.",
-            type: "about:blank");
-
-    var experiment = await orchestrator.GetActiveFaultForServiceAsync(canonical, ct);
-    if (experiment is null)
-        return Results.NoContent();
-
-    // Hand out a duration, not a timestamp: the consumer counts it down on its own monotonic
-    // clock, so clock skew between machines can't stretch or shorten the fault.
-    var remaining = (int)Math.Ceiling((experiment.ExpiresAt - time.GetUtcNow().UtcDateTime).TotalSeconds);
-    if (remaining < 1)
-        return Results.NoContent(); // expired between the query and now
-
-    return Results.Ok(new FaultDirective(
-        experiment.Id,
-        experiment.FaultType,
-        experiment.LatencyMs,
-        experiment.Percent,
-        experiment.StatusCode,
-        remaining));
-})
-    .RequireAuthorization(DataPlaneDefaults.Policy)
-    .RequireRateLimiting(HttpHardening.DataPlanePolicy);
-
-api.MapPost("/chaos/inject", async (
-        FaultInjectionRequest request,
-        HttpContext http,
-        IChaosOrchestrator orchestrator,
-        CancellationToken ct) =>
-    {
-        // Validation (targets, fault types, parameter bounds) lives in ChaosRules and is
-        // re-enforced inside the orchestrator.
-        if (!ChaosRules.TryValidate(request, out _, out var error))
-            return Results.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "Invalid fault injection request.",
-                detail: error,
-                type: "about:blank");
-
-        // The actor comes from validated claims; the request's TriggeredBy is ignored, so the
-        // audit trail cannot be spoofed.
-        if (!ActorResolver.TryResolve(http.User, out var actor))
-            return Results.Problem(
-                statusCode: StatusCodes.Status403Forbidden,
-                title: "Caller has no stable identity.",
-                type: "about:blank");
-
-        try
-        {
-            await orchestrator.InjectFaultAsync(request, actor, ct);
-        }
-        catch (KillSwitchEngagedException)
-        {
-            return Results.Problem(
-                statusCode: StatusCodes.Status409Conflict,
-                title: "Fault injection is suspended by the kill switch.",
-                type: "about:blank");
-        }
-
-        return Results.Accepted("/api/v1/chaos/faults", request with { TriggeredBy = actor.Id });
-    })
-    .RequireAuthorization(ControlPlane(ChaosPolicies.Operate))
-    .RequireRateLimiting(HttpHardening.MutatePolicy)
-    .AddEndpointFilter<CookieAntiforgeryFilter>();
-
-// Global kill switch: everyone who can view sees its state; only admins change it.
-api.MapGet("/chaos/kill-switch", async (IChaosOrchestrator orchestrator, CancellationToken ct) =>
-        Results.Ok(await orchestrator.GetKillSwitchAsync(ct)))
-    .RequireAuthorization(ControlPlane(ChaosPolicies.View))
-    .RequireRateLimiting(HttpHardening.ReadPolicy);
-
-MapKillSwitchChange("/chaos/kill-switch/engage", (o, reason, actor, ct) => o.EngageKillSwitchAsync(reason, actor, ct));
-MapKillSwitchChange("/chaos/kill-switch/release", (o, reason, actor, ct) => o.ReleaseKillSwitchAsync(reason, actor, ct));
-
-void MapKillSwitchChange(
-    string pattern,
-    Func<IChaosOrchestrator, string, Actor, CancellationToken, Task<KillSwitchState>> change) =>
-    api.MapPost(pattern, async (
-            KillSwitchRequest request,
-            HttpContext http,
-            IChaosOrchestrator orchestrator,
-            CancellationToken ct) =>
-        {
-            if (!KillSwitchEvent.TryNormalizeReason(request.Reason, out var reason, out var error))
-                return Results.Problem(
-                    statusCode: StatusCodes.Status400BadRequest,
-                    title: "Invalid kill switch request.",
-                    detail: error,
-                    type: "about:blank");
-
-            if (!ActorResolver.TryResolve(http.User, out var actor))
-                return Results.Problem(
-                    statusCode: StatusCodes.Status403Forbidden,
-                    title: "Caller has no stable identity.",
-                    type: "about:blank");
-
-            return Results.Ok(await change(orchestrator, reason, actor, ct));
-        })
-        .RequireAuthorization(ControlPlane(ChaosPolicies.Admin))
-        .RequireRateLimiting(HttpHardening.MutatePolicy)
-        .AddEndpointFilter<CookieAntiforgeryFilter>();
+api.MapControlPlaneEndpoints();
+api.MapDataPlaneEndpoints();
 
 // 4. MAP ROOT UI PATHS
 // Static assets are endpoints in .NET 10: MapStaticAssets serves _framework/blazor.web.js and the
@@ -433,30 +138,5 @@ app.MapRazorComponents<App>()
     .AddAdditionalAssemblies(typeof(Stria.Client._Imports).Assembly);
 
 app.Run();
-
-// Control-plane routes accept the browser cookie or a bearer token, named explicitly so a
-// change to the default scheme can never silently change who may call them.
-static AuthorizeAttribute ControlPlane(string? policy) => new()
-{
-    AuthenticationSchemes = $"{CookieAuthenticationDefaults.AuthenticationScheme},{JwtBearerDefaults.AuthenticationScheme}",
-    Policy = policy
-};
-
-static bool IsApi(HttpRequest request) => request.Path.StartsWithSegments("/api");
-
-static Task SetStatus(HttpResponse response, int statusCode)
-{
-    response.StatusCode = statusCode;
-    return Task.CompletedTask;
-}
-
-// Prevents open redirects: only same-site relative paths, never "//host" or "/\host", and no
-// control characters (browsers strip tabs/newlines, which could turn "/\t/host" into "//host").
-static string LocalUrl(string? url) =>
-    url is ['/', ..]
-    && (url.Length == 1 || url[1] is not ('/' or '\\'))
-    && !url.Any(char.IsControl)
-        ? url
-        : "/";
 
 public partial class Program { }

@@ -15,6 +15,17 @@ public static class StriaDataSource
     /// <summary>The token audience Azure Database for PostgreSQL accepts.</summary>
     public const string PostgresTokenScope = "https://ossrdbms-aad.database.windows.net/.default";
 
+    public const string ConnectionStringName = "Stria";
+
+    /// <summary>
+    /// The app's connection string, or a startup error that names the setting (never its value).
+    /// Startup validation and persistence both read it here, so the message lives in one place.
+    /// </summary>
+    public static string RequiredConnectionString(IConfiguration configuration) =>
+        configuration.GetConnectionString(ConnectionStringName)
+        ?? throw new InvalidOperationException(
+            "Connection string 'Stria' is not configured. Set ConnectionStrings__Stria (never commit credentials).");
+
     /// <param name="credential">Created only when Entra auth is on.</param>
     public static NpgsqlDataSource Create(string connectionString, bool useEntraAuth, Lazy<TokenCredential> credential)
     {
