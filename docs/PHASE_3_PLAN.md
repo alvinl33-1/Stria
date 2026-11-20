@@ -108,6 +108,14 @@ allowed for other proxies. App Insights is optional.
 **Acceptance:** CI produces a scanned, SHA-tagged image set and a migration bundle on every push
 to `main`.
 
+**As built (2026-11-19):** `container-build` builds four `linux/amd64` images tagged
+`sha-<commit>` (`stria-api`, `stria-migrator`, `stria-client`, `stria-sample`), applies the
+migrations bundle to an empty PostgreSQL twice, and scans every image with Trivy (pinned by
+digest), failing on fixable HIGH/CRITICAL findings. SARIF goes to code scanning from `main`.
+The bundle builds its context with `Data/StriaDbContextDesignTimeFactory.cs` and is configured
+like the app: `ConnectionStrings__Stria`, plus `Database__UseEntraAuth=true` in Azure.
+Nothing is pushed; that is Step 5.
+
 ### Step 3 — Infrastructure as code, no Azure needed until deploy
 
 - `infra/main.bicep` with modules for the resource set in §3, `infra/main.parameters.json`
@@ -168,7 +176,7 @@ and what it costs before anything is deployed.
 ## 7. Definition of done
 
 - [x] Cloud-specific behaviour is opt-in, tested, and Compose still passes the smoke script.
-- [ ] CI produces scanned, SHA-tagged images and a migration bundle.
+- [x] CI produces scanned, SHA-tagged images and a migration bundle.
 - [ ] Bicep and `azure.yaml` describe the full resource set with no secrets.
 - [ ] Deployment by CI uses OIDC and a protected environment.
 - [ ] The hosted demo passes the hosted smoke test and a signed-in walkthrough for each role.
