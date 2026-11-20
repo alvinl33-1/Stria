@@ -1,7 +1,7 @@
 # Stria Phase 3 Plan — Hosted Demo on Azure Container Apps
 
-**Status:** Not started. Prepared on 2026-11-18 after Phase 2 closed
-([PHASE_2_HANDOFF.md](PHASE_2_HANDOFF.md)).
+**Status:** Step 1 built on 2026-11-18 (139 tests). Step 2 is next. Prepared on 2026-11-18 after
+Phase 2 closed ([PHASE_2_HANDOFF.md](PHASE_2_HANDOFF.md)).
 
 **Authorization gate:** Steps 1–3 below change only code, CI and documentation and need no Azure
 account. **Step 4 onward creates billable Azure resources and must not start until Alvin explicitly
@@ -80,6 +80,22 @@ test suite keep working unchanged.
 **Acceptance:** all existing tests pass, new configuration paths have tests, Compose and
 `scripts/compose-smoke.sh` behave as before.
 
+**As built (2026-11-18):** 139 tests pass (20 new). Compose sets none of the settings below and passes
+the smoke script unchanged. Startup refuses a half-configured Azure deployment, naming the missing
+keys but never their values.
+
+| Setting (environment variable form) | Azure value | Effect | Code |
+|---|---|---|---|
+| `ForwardedHeaders__Enabled` | `true` | Trusts `X-Forwarded-For`/`-Proto` from the ingress | `Program.cs` |
+| `DataProtection__BlobUri` | Blob URI of `keys.xml` in the `dpkeys` container | Key ring in Blob instead of the volume | `Security/DataProtectionSetup.cs` |
+| `DataProtection__KeyVaultKeyUri` | Key Vault key URI | Wraps every key in the ring | same |
+| `Database__UseEntraAuth` | `true` | Managed-identity token as the PostgreSQL password; the connection string must not contain one | `Data/StriaDataSource.cs` |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | From App Insights | Exports traces (`Stria` spans and Npgsql) | `Services/StriaTelemetry.cs` |
+| `AZURE_CLIENT_ID` | User-assigned identity's client ID | Picks that identity for `DefaultAzureCredential` | (Azure SDK) |
+
+The first four are all-or-nothing (`Security/AzureRuntimeSettings.cs`); forwarded headers alone are
+allowed for other proxies. App Insights is optional.
+
 ### Step 2 — Release artifacts in CI, no Azure needed
 
 - Build an EF migrations bundle (`dotnet ef migrations bundle --self-contained -r linux-x64`) and
@@ -151,7 +167,7 @@ and what it costs before anything is deployed.
 
 ## 7. Definition of done
 
-- [ ] Cloud-specific behaviour is opt-in, tested, and Compose still passes the smoke script.
+- [x] Cloud-specific behaviour is opt-in, tested, and Compose still passes the smoke script.
 - [ ] CI produces scanned, SHA-tagged images and a migration bundle.
 - [ ] Bicep and `azure.yaml` describe the full resource set with no secrets.
 - [ ] Deployment by CI uses OIDC and a protected environment.

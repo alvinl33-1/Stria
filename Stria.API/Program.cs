@@ -1,6 +1,8 @@
 // Stria.API/Program.cs
 
 using System.Security.Claims;
+using Azure.Core;
+using Azure.Identity;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -8,7 +10,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
@@ -48,6 +50,10 @@ var connectionString = builder.Configuration.GetConnectionString("Stria")
     ?? throw new InvalidOperationException(
         "Connection string 'Stria' is not configured. Set ConnectionStrings__Stria (never commit credentials).");
 
+// Azure resources (Blob, Key Vault, PostgreSQL) are reached with the container app's managed
+// identity. Created only if one of them is configured, so Compose and tests never build it.
+var azureCredential = new Lazy<TokenCredential>(() => new DefaultAzureCredential());
+
 // Identity settings. Outside Development a missing value stops startup instead of running with
 // broken sign-in. There is deliberately no switch that turns authentication off.
 if (!builder.Environment.IsDevelopment())
@@ -67,7 +73,19 @@ if (!builder.Environment.IsDevelopment())
             "DataPlane:ServiceKeyHashes has no entries, so no service could read its directives.");
 }
 
-builder.Services.AddDbContextFactory<StriaDbContext>(options => options.UseNpgsql(connectionString));
+// Azure settings, in every environment: a half-configured deployment must not start.
+var missingAzure = AzureRuntimeSettings.Missing(builder.Configuration);
+if (missingAzure.Count > 0)
+    throw new InvalidOperationException(
+        $"Azure settings incomplete: {string.Join(", ", missingAzure)}. Set all of them, or none for local use.");
+if (builder.Configuration.GetValue<bool>(StriaDataSource.UseEntraAuthKey) && AzureRuntimeSettings.HasPassword(connectionString))
+    throw new InvalidOperationException(
+        $"{StriaDataSource.UseEntraAuthKey} is on, so ConnectionStrings:Stria must not contain a password.");
+
+var dataSource = StriaDataSource.Create(
+    connectionString, builder.Configuration.GetValue<bool>(StriaDataSource.UseEntraAuthKey), azureCredential);
+builder.Services.AddSingleton(dataSource);
+builder.Services.AddDbContextFactory<StriaDbContext>(options => options.UseNpgsql(dataSource));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.Configure<ExperimentRetentionOptions>(
     builder.Configuration.GetSection(ExperimentRetentionOptions.SectionName));
@@ -78,10 +96,7 @@ builder.Services.AddSingleton<IChaosOrchestrator, DatabaseChaosOrchestrator>();
 builder.Services.AddHostedService<ExperimentRetentionService>();
 builder.Services.AddHostedService<ExperimentExpiryService>();
 
-builder.Services.AddDataProtection()
-    .SetApplicationName("Stria.API")
-    .PersistKeysToFileSystem(new DirectoryInfo(
-        builder.Configuration["DataProtection:KeysPath"] ?? "/var/lib/stria/dpkeys"));
+builder.Services.AddStriaDataProtection(builder.Configuration, azureCredential);
 
 // Authentication.
 //   Browser operators: OpenID Connect (authorization-code flow) + an encrypted cookie.
@@ -176,6 +191,24 @@ builder.Services.AddAuthorization(options =>
 // Cookie-authenticated JSON mutations send the antiforgery token in this header.
 builder.Services.AddAntiforgery(options => options.HeaderName = "X-XSRF-TOKEN");
 builder.Services.AddChaosRateLimiting(builder.Configuration);
+builder.Services.AddStriaTelemetry(builder.Configuration);
+
+// Behind Azure Container Apps ingress, TLS ends at the proxy and the original scheme and client
+// IP arrive in X-Forwarded-* headers. Without them the OIDC redirect_uri is built as http:// and
+// sign-in fails. Off by default: Compose has no proxy, and trusting these headers there would
+// let any caller spoof them.
+var forwardedHeadersEnabled = builder.Configuration.GetValue<bool>(AzureRuntimeSettings.ForwardedHeadersKey);
+if (forwardedHeadersEnabled)
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        // The ingress IPs aren't fixed, and the container is reachable only through the
+        // ingress, so trust whichever proxy is in front of it.
+        options.KnownIPNetworks.Clear();
+        options.KnownProxies.Clear();
+    });
+}
 
 var app = builder.Build();
 
@@ -188,6 +221,11 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 }
 
 // 2. MIDDLEWARE ROUTING PIPELINE
+// First, so HSTS, HTTPS redirection, the cookie Secure flag and the OIDC redirect_uri all see
+// the scheme the browser actually used.
+if (forwardedHeadersEnabled)
+    app.UseForwardedHeaders();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseWebAssemblyDebugging();

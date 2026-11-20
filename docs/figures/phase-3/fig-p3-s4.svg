@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 450" role="img" aria-labelledby="fig-p3-s4-title fig-p3-s4-desc" font-family="JetBrains Mono, ui-monospace, monospace" fill="var(--m-ink, #1a1a1a)">
+  <title id="fig-p3-s4-title">Sprint 4: provisioning and the one-time setup, after authorization</title>
+  <desc id="fig-p3-s4-desc">Lifelines: Alvin, azd with Bicep, the Azure resource group and Entra ID. 1 Alvin runs azd provision after written approval. 2 azd creates the resources and budget. 3 Azure returns outputs. 4 Alvin sets the PostgreSQL Entra admin. 5 creates the identity principal with minimal grants. 6 stores secrets in Key Vault. 7 adds the hosted redirect URIs in Entra ID.</desc>
+  <rect x="0" y="0" width="640" height="450" fill="var(--m-panel, #f3f1e8)"/>
+  <defs><marker id="fig-p3-s4-head-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 1 L10 5 L0 9 z" fill="var(--m-ink, #1a1a1a)"/></marker><marker id="fig-p3-s4-head-teal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 1 L10 5 L0 9 z" fill="var(--m-teal-ink, #18696a)"/></marker></defs>
+  <text x="20" y="18" font-size="11" letter-spacing="1.2" fill="var(--m-ink-mute, #6f6f6a)">SPRINT 4 · PROVISION · REQUIRES AUTHORIZATION</text>
+  <rect x="20" y="28" width="144" height="40" fill="var(--m-grey-fill, #ecebe3)" stroke="var(--m-grey-ink, #5e5e59)"/>
+  <text x="92" y="46" font-size="12.5" text-anchor="middle" font-weight="700">Alvin</text>
+  <text x="92" y="60" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">operator</text>
+  <line x1="92" y1="68" x2="92" y2="408" stroke="var(--m-ink-mute, #6f6f6a)" stroke-width="1" stroke-dasharray="2 3"/>
+  <rect x="168" y="28" width="144" height="40" fill="var(--m-violet-fill, #ebe8f5)" stroke="var(--m-violet-ink, #5b4fa3)"/>
+  <text x="240" y="46" font-size="12.5" text-anchor="middle" font-weight="700">azd + Bicep</text>
+  <text x="240" y="60" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">infra/main.bicep</text>
+  <line x1="240" y1="68" x2="240" y2="408" stroke="var(--m-ink-mute, #6f6f6a)" stroke-width="1" stroke-dasharray="2 3"/>
+  <rect x="316" y="28" width="144" height="40" fill="var(--m-teal-fill, #e1efee)" stroke="var(--m-teal-ink, #18696a)"/>
+  <text x="388" y="46" font-size="12.5" text-anchor="middle" font-weight="700">Azure</text>
+  <text x="388" y="60" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">rg-stria-demo</text>
+  <line x1="388" y1="68" x2="388" y2="408" stroke="var(--m-ink-mute, #6f6f6a)" stroke-width="1" stroke-dasharray="2 3"/>
+  <rect x="476" y="28" width="144" height="40" fill="var(--m-grey-fill, #ecebe3)" stroke="var(--m-grey-ink, #5e5e59)"/>
+  <text x="548" y="46" font-size="12.5" text-anchor="middle" font-weight="700">Entra ID</text>
+  <text x="548" y="60" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">app registration</text>
+  <line x1="548" y1="68" x2="548" y2="408" stroke="var(--m-ink-mute, #6f6f6a)" stroke-width="1" stroke-dasharray="2 3"/>
+  <circle cx="16" cy="104" r="9" fill="var(--m-paper, #fafaf5)" stroke="var(--m-ink, #1a1a1a)" stroke-width="1"/>
+  <text x="16" y="108" font-size="11" text-anchor="middle">1</text>
+  <line x1="92" y1="104" x2="239" y2="104" stroke="var(--m-ink, #1a1a1a)" stroke-width="1.2" marker-end="url(#fig-p3-s4-head-ink)"/>
+  <rect class="m-knock" x="117.65" y="87.03" width="95.7" height="15.5" fill="var(--m-panel, #f3f1e8)"/>
+  <text x="165.5" y="98" font-size="11.5" text-anchor="middle">azd provision</text>
+  <rect class="m-knock" x="97.16" y="108.42" width="136.68" height="15" fill="var(--m-panel, #f3f1e8)"/>
+  <text x="165.5" y="119" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">after written approval</text>
+  <circle cx="16" cy="150" r="9" fill="var(--m-paper, #fafaf5)" stroke="var(--m-ink, #1a1a1a)" stroke-width="1"/>
+  <text x="16" y="154" font-size="11" text-anchor="middle">2</text>
+  <line x1="240" y1="150" x2="387" y2="150" stroke="var(--m-teal-ink, #18696a)" stroke-width="1.2" marker-end="url(#fig-p3-s4-head-teal)"/>
+  <rect class="m-knock" x="224.25" y="133.03" width="178.5" height="15.5" fill="var(--m-panel, #f3f1e8)"/>
+  <text x="313.5" y="144" font-size="11.5" text-anchor="middle" fill="var(--m-teal-ink, #18696a)">create resources + budget</text>
+  <circle cx="16" cy="196" r="9" fill="var(--m-paper, #fafaf5)" stroke="var(--m-ink, #1a1a1a)" stroke-width="1"/>
+  <text x="16" y="200" font-size="11" text-anchor="middle">3</text>
+  <line x1="388" y1="196" x2="241" y2="196" stroke="var(--m-ink, #1a1a1a)" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#fig-p3-s4-head-ink)"/>
+  <rect class="m-knock" x="221.8" y="179.03" width="185.4" height="15.5" fill="var(--m-panel, #f3f1e8)"/>
+  <text x="314.5" y="190" font-size="11.5" text-anchor="middle">outputs: app URL, identity</text>
+  <circle cx="16" cy="242" r="9" fill="var(--m-paper, #fafaf5)" stroke="var(--m-ink, #1a1a1a)" stroke-width="1"/>
+  <text x="16" y="246" font-size="11" text-anchor="middle">4</text>
+  <line x1="92" y1="242" x2="387" y2="242" stroke="var(--m-ink, #1a1a1a)" stroke-width="1.2" marker-end="url(#fig-p3-s4-head-ink)"/>
+  <rect class="m-knock" x="146.8" y="225.03" width="185.4" height="15.5" fill="var(--m-panel, #f3f1e8)"/>
+  <text x="239.5" y="236" font-size="11.5" text-anchor="middle">set PostgreSQL Entra admin</text>
+  <circle cx="16" cy="288" r="9" fill="var(--m-paper, #fafaf5)" stroke="var(--m-ink, #1a1a1a)" stroke-width="1"/>
+  <text x="16" y="292" font-size="11" text-anchor="middle">5</text>
+  <line x1="92" y1="288" x2="387" y2="288" stroke="var(--m-teal-ink, #18696a)" stroke-width="1.2" marker-end="url(#fig-p3-s4-head-teal)"/>
+  <rect class="m-knock" x="146.8" y="271.03" width="185.4" height="15.5" fill="var(--m-panel, #f3f1e8)"/>
+  <text x="239.5" y="282" font-size="11.5" text-anchor="middle" fill="var(--m-teal-ink, #18696a)">pgaadauth_create_principal</text>
+  <rect class="m-knock" x="153.33999999999997" y="292.42" width="172.32000000000002" height="15" fill="var(--m-panel, #f3f1e8)"/>
+  <text x="239.5" y="303" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">identity gets minimal grants</text>
+  <circle cx="16" cy="334" r="9" fill="var(--m-paper, #fafaf5)" stroke="var(--m-ink, #1a1a1a)" stroke-width="1"/>
+  <text x="16" y="338" font-size="11" text-anchor="middle">6</text>
+  <line x1="92" y1="334" x2="387" y2="334" stroke="var(--m-teal-ink, #18696a)" stroke-width="1.2" marker-end="url(#fig-p3-s4-head-teal)"/>
+  <rect class="m-knock" x="177.85" y="317.03" width="123.3" height="15.5" fill="var(--m-panel, #f3f1e8)"/>
+  <text x="239.5" y="328" font-size="11.5" text-anchor="middle" fill="var(--m-teal-ink, #18696a)">Key Vault secrets</text>
+  <rect class="m-knock" x="150.37" y="338.42" width="178.26000000000002" height="15" fill="var(--m-panel, #f3f1e8)"/>
+  <text x="239.5" y="349" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">client secret, data-plane key</text>
+  <circle cx="16" cy="380" r="9" fill="var(--m-paper, #fafaf5)" stroke="var(--m-ink, #1a1a1a)" stroke-width="1"/>
+  <text x="16" y="384" font-size="11" text-anchor="middle">7</text>
+  <line x1="92" y1="380" x2="547" y2="380" stroke="var(--m-ink, #1a1a1a)" stroke-width="1.2" marker-end="url(#fig-p3-s4-head-ink)"/>
+  <rect class="m-knock" x="233.7" y="363.03" width="171.6" height="15.5" fill="var(--m-panel, #f3f1e8)"/>
+  <text x="319.5" y="374" font-size="11.5" text-anchor="middle">add hosted redirect URIs</text>
+  <rect class="m-knock" x="209.57999999999998" y="384.42" width="219.84" height="15" fill="var(--m-panel, #f3f1e8)"/>
+  <text x="319.5" y="395" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">/signin-oidc, /signout-callback-oidc</text>
+  <text x="20" y="432" font-size="11" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">Before step 1: region, monthly budget and a teardown date agreed in writing (PHASE_3_PLAN.md section 5).</text>
+</svg>

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 470" role="img" aria-labelledby="fig-p3-s2-title fig-p3-s2-desc" font-family="JetBrains Mono, ui-monospace, monospace" fill="var(--m-ink, #1a1a1a)">
+  <title id="fig-p3-s2-title">Sprint 2: CI builds scanned, SHA-tagged images and a migration bundle</title>
+  <desc id="fig-p3-s2-desc">A push or pull request starts the container-build job. docker build targets linux/amd64, the image is tagged sha-commit, Trivy scans it and a HIGH or CRITICAL finding fails the job, then the efbundle migration image is built and run against CI PostgreSQL. Pull requests push nothing; main hands the images to the Sprint 5 deploy.</desc>
+  <rect x="0" y="0" width="640" height="470" fill="var(--m-panel, #f3f1e8)"/>
+  <defs><marker id="fig-p3-s2-head-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 1 L10 5 L0 9 z" fill="var(--m-ink, #1a1a1a)"/></marker><marker id="fig-p3-s2-head-rose" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 1 L10 5 L0 9 z" fill="var(--m-rose-ink, #b0344d)"/></marker></defs>
+  <text x="20" y="18" font-size="11" letter-spacing="1.2" fill="var(--m-ink-mute, #6f6f6a)">SPRINT 2 · RELEASE ARTIFACTS IN CI · NO AZURE LOGIN</text>
+  <rect x="40" y="34" width="340" height="42" fill="var(--m-grey-fill, #ecebe3)" stroke="var(--m-grey-ink, #5e5e59)"/>
+  <text x="210" y="53" font-size="12.5" text-anchor="middle" font-weight="700">GitHub: push or pull_request</text>
+  <text x="210" y="67" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">ci.yml, container-build job</text>
+  <rect x="40" y="98" width="340" height="42" fill="var(--m-blue-fill, #e6edf6)" stroke="var(--m-blue-ink, #2f5d9a)"/>
+  <text x="210" y="117" font-size="12.5" text-anchor="middle" font-weight="700">docker build</text>
+  <text x="210" y="131" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">--platform linux/amd64 (Macs build arm64)</text>
+  <rect x="40" y="162" width="340" height="42" fill="var(--m-violet-fill, #ebe8f5)" stroke="var(--m-violet-ink, #5b4fa3)"/>
+  <text x="210" y="181" font-size="12.5" text-anchor="middle" font-weight="700">tag sha-&lt;commit&gt;</text>
+  <text x="210" y="195" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">never latest; the same tag through deploy</text>
+  <rect x="40" y="226" width="340" height="42" fill="var(--m-green-fill, #e5f0e4)" stroke="var(--m-green-ink, #336b40)"/>
+  <text x="210" y="245" font-size="12.5" text-anchor="middle" font-weight="700">Trivy image scan</text>
+  <text x="210" y="259" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">HIGH or CRITICAL fails the job; SARIF uploaded</text>
+  <rect x="40" y="290" width="340" height="42" fill="var(--m-violet-fill, #ebe8f5)" stroke="var(--m-violet-ink, #5b4fa3)"/>
+  <text x="210" y="309" font-size="12.5" text-anchor="middle" font-weight="700">efbundle migration image</text>
+  <text x="210" y="323" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">bundle run against the CI PostgreSQL service</text>
+  <line x1="210" y1="76" x2="210" y2="97" stroke="var(--m-ink, #1a1a1a)" stroke-width="1.2" marker-end="url(#fig-p3-s2-head-ink)"/>
+  <line x1="210" y1="140" x2="210" y2="161" stroke="var(--m-ink, #1a1a1a)" stroke-width="1.2" marker-end="url(#fig-p3-s2-head-ink)"/>
+  <line x1="210" y1="204" x2="210" y2="225" stroke="var(--m-ink, #1a1a1a)" stroke-width="1.2" marker-end="url(#fig-p3-s2-head-ink)"/>
+  <line x1="210" y1="268" x2="210" y2="289" stroke="var(--m-ink, #1a1a1a)" stroke-width="1.2" marker-end="url(#fig-p3-s2-head-ink)"/>
+  <rect x="430" y="216" width="190" height="62" fill="var(--m-rose-fill, #f7e4e7)" stroke="var(--m-rose-ink, #b0344d)" stroke-dasharray="5 4"/>
+  <text x="525" y="245" font-size="12.5" text-anchor="middle" font-weight="700">container-build fails</text>
+  <text x="525" y="259" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">required check blocks merge</text>
+  <line x1="380" y1="247" x2="429" y2="247" stroke="var(--m-rose-ink, #b0344d)" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#fig-p3-s2-head-rose)"/>
+  <rect x="40" y="386" width="260" height="46" fill="var(--m-grey-fill, #ecebe3)" stroke="var(--m-grey-ink, #5e5e59)" stroke-dasharray="5 4"/>
+  <text x="170" y="407" font-size="12.5" text-anchor="middle" font-weight="700">pull_request</text>
+  <text x="170" y="421" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">nothing is pushed</text>
+  <rect x="340" y="386" width="280" height="46" fill="var(--m-violet-fill, #ebe8f5)" stroke="var(--m-violet-ink, #5b4fa3)" stroke-dasharray="5 4"/>
+  <text x="480" y="407" font-size="12.5" text-anchor="middle" font-weight="700">push to main</text>
+  <text x="480" y="421" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">images ready for the Sprint 5 deploy</text>
+  <line x1="210" y1="332" x2="170" y2="385" stroke="var(--m-ink, #1a1a1a)" stroke-width="1.2" marker-end="url(#fig-p3-s2-head-ink)"/>
+  <line x1="210" y1="332" x2="480" y2="385" stroke="var(--m-ink, #1a1a1a)" stroke-width="1.2" marker-end="url(#fig-p3-s2-head-ink)"/>
+  <text x="20" y="456" font-size="11" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">Publishing to Azure Container Registry is part of the deploy job in Sprint 5, never a PR.</text>
+</svg>

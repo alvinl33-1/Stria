@@ -49,6 +49,10 @@ public class DatabaseChaosOrchestrator : IChaosOrchestrator
 
         actor = ValidateActor(actor);
 
+        using var activity = StriaTelemetry.Source.StartActivity("stria.fault.inject");
+        activity?.SetTag(StriaTelemetry.TargetServiceTag, fault.TargetService);
+        activity?.SetTag(StriaTelemetry.FaultTypeTag, fault.FaultType);
+
         for (var attempt = 1; ; attempt++)
         {
             try
@@ -74,14 +78,20 @@ public class DatabaseChaosOrchestrator : IChaosOrchestrator
         if (!ChaosRules.TryGetService(serviceName, out var service))
             return null;
 
+        using var activity = StriaTelemetry.Source.StartActivity("stria.directive.read");
+        activity?.SetTag(StriaTelemetry.TargetServiceTag, service);
+
         var now = _time.GetUtcNow().UtcDateTime;
 
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        return await db.ChaosExperiments
+        var active = await db.ChaosExperiments
             .AsNoTracking()
             .SingleOrDefaultAsync(
                 e => e.TargetService == service && e.Status == ExperimentStatus.Active && e.ExpiresAt > now,
                 cancellationToken);
+
+        activity?.SetTag(StriaTelemetry.DirectiveFoundTag, active is not null);
+        return active;
     }
 
     public async Task<IReadOnlyList<ChaosExperiment>> GetAllActiveFaultsAsync(
@@ -133,6 +143,9 @@ public class DatabaseChaosOrchestrator : IChaosOrchestrator
         actor = ValidateActor(actor);
         if (!KillSwitchEvent.TryNormalizeReason(reason, out var normalizedReason, out var error))
             throw new ArgumentException(error, nameof(reason));
+
+        using var activity = StriaTelemetry.Source.StartActivity(
+            engage ? "stria.kill_switch.engage" : "stria.kill_switch.release");
 
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);

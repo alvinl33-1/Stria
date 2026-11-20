@@ -50,7 +50,7 @@ Compose starts PostgreSQL, waits for its health check, starts Stria, and starts 
 
 Stop the stack with `Ctrl+C`; use `docker compose down` to stop and remove the containers. The named `stria-pgdata` volume retains database contents when containers are removed, and `stria-dpkeys` retains Data Protection keys.
 
-For an automated smoke test of the running stack, run `scripts/compose-smoke.sh` from the repository root. It reads the sample service's key from `.env` and checks health, that anonymous callers get `401` on every control and directive route, data-plane key isolation, the enforced Content Security Policy, and that the image serves the Blazor script. Signed-in flows need a browser.
+For an automated smoke test of the running stack, run `scripts/compose-smoke.sh` from the repository root. It reads the sample service's key from `.env` and checks health, that anonymous callers get `401` on every control and directive route, data-plane key isolation, the enforced Content Security Policy, and that the image serves the Blazor script. It first waits up to 60 seconds for `/readyz` (set `STRIA_READY_TIMEOUT` to change this), so it can run straight after `docker compose up -d`. Signed-in flows need a browser.
 
 For a manual check, open the dashboard, inject bounded latency for `PaymentGateway`, and call `http://localhost:8081/work` repeatedly to observe the delay. Clear the fault and confirm the delay stops after the lease expires. The API process and database readiness endpoints should both return `200`:
 

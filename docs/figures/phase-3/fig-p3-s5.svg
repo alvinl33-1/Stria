@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 430" role="img" aria-labelledby="fig-p3-s5-title fig-p3-s5-desc" font-family="JetBrains Mono, ui-monospace, monospace" fill="var(--m-ink, #1a1a1a)">
+  <title id="fig-p3-s5-title">Sprint 5: the OIDC deploy job stops at the first failing stage</title>
+  <desc id="fig-p3-s5-desc">Six stages run in order: CI checks pass on main, Alvin approves the demo environment, an OIDC federated token is issued, sha- images are pushed to ACR, the migration job runs, then both container apps move to the new revision. A failure at any stage stops the deploy and the old revision keeps serving.</desc>
+  <rect x="0" y="0" width="640" height="430" fill="var(--m-panel, #f3f1e8)"/>
+  <defs><marker id="fig-p3-s5-head-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 1 L10 5 L0 9 z" fill="var(--m-ink, #1a1a1a)"/></marker><marker id="fig-p3-s5-head-rose" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 1 L10 5 L0 9 z" fill="var(--m-rose-ink, #b0344d)"/></marker></defs>
+  <text x="20" y="18" font-size="11" letter-spacing="1.2" fill="var(--m-ink-mute, #6f6f6a)">SPRINT 5 · CI DEPLOY WITH OIDC · REQUIRES AUTHORIZATION</text>
+  <rect x="30" y="34" width="340" height="42" fill="var(--m-green-fill, #e5f0e4)" stroke="var(--m-green-ink, #336b40)"/>
+  <text x="200" y="53" font-size="12.5" text-anchor="middle" font-weight="700">CI checks pass on main</text>
+  <text x="200" y="67" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">build-and-test, audit, review, container-build</text>
+  <rect x="30" y="96" width="340" height="42" fill="var(--m-grey-fill, #ecebe3)" stroke="var(--m-grey-ink, #5e5e59)"/>
+  <text x="200" y="115" font-size="12.5" text-anchor="middle" font-weight="700">environment: demo</text>
+  <text x="200" y="129" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">Alvin approves the run</text>
+  <rect x="30" y="158" width="340" height="42" fill="var(--m-violet-fill, #ebe8f5)" stroke="var(--m-violet-ink, #5b4fa3)"/>
+  <text x="200" y="177" font-size="12.5" text-anchor="middle" font-weight="700">OIDC federated token</text>
+  <text x="200" y="191" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">azure/login; no secret stored in GitHub</text>
+  <rect x="30" y="220" width="340" height="42" fill="var(--m-teal-fill, #e1efee)" stroke="var(--m-teal-ink, #18696a)"/>
+  <text x="200" y="239" font-size="12.5" text-anchor="middle" font-weight="700">push sha- images to ACR</text>
+  <text x="200" y="253" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">stria-server, gateway, efbundle</text>
+  <rect x="30" y="282" width="340" height="42" fill="var(--m-amber-fill, #f5ecd9)" stroke="var(--m-amber-ink, #85590c)"/>
+  <text x="200" y="301" font-size="12.5" text-anchor="middle" font-weight="700">run migration job</text>
+  <text x="200" y="315" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">efbundle; wait for success</text>
+  <rect x="30" y="344" width="340" height="42" fill="var(--m-blue-fill, #e6edf6)" stroke="var(--m-blue-ink, #2f5d9a)"/>
+  <text x="200" y="363" font-size="12.5" text-anchor="middle" font-weight="700">update both container apps</text>
+  <text x="200" y="377" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">new revision on the same sha- tag</text>
+  <line x1="200" y1="76" x2="200" y2="95" stroke="var(--m-ink, #1a1a1a)" stroke-width="1.2" marker-end="url(#fig-p3-s5-head-ink)"/>
+  <line x1="200" y1="138" x2="200" y2="157" stroke="var(--m-ink, #1a1a1a)" stroke-width="1.2" marker-end="url(#fig-p3-s5-head-ink)"/>
+  <line x1="200" y1="200" x2="200" y2="219" stroke="var(--m-ink, #1a1a1a)" stroke-width="1.2" marker-end="url(#fig-p3-s5-head-ink)"/>
+  <line x1="200" y1="262" x2="200" y2="281" stroke="var(--m-ink, #1a1a1a)" stroke-width="1.2" marker-end="url(#fig-p3-s5-head-ink)"/>
+  <line x1="200" y1="324" x2="200" y2="343" stroke="var(--m-ink, #1a1a1a)" stroke-width="1.2" marker-end="url(#fig-p3-s5-head-ink)"/>
+  <rect x="440" y="34" width="180" height="352" fill="var(--m-rose-fill, #f7e4e7)" stroke="var(--m-rose-ink, #b0344d)" stroke-dasharray="5 4"/>
+  <text x="530" y="208" font-size="12.5" text-anchor="middle" font-weight="700">deploy stops</text>
+  <text x="530" y="222" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">old revision keeps serving</text>
+  <line x1="370" y1="55" x2="439" y2="55" stroke="var(--m-rose-ink, #b0344d)" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#fig-p3-s5-head-rose)"/>
+  <line x1="370" y1="117" x2="439" y2="117" stroke="var(--m-rose-ink, #b0344d)" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#fig-p3-s5-head-rose)"/>
+  <line x1="370" y1="179" x2="439" y2="179" stroke="var(--m-rose-ink, #b0344d)" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#fig-p3-s5-head-rose)"/>
+  <line x1="370" y1="241" x2="439" y2="241" stroke="var(--m-rose-ink, #b0344d)" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#fig-p3-s5-head-rose)"/>
+  <line x1="370" y1="303" x2="439" y2="303" stroke="var(--m-rose-ink, #b0344d)" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#fig-p3-s5-head-rose)"/>
+  <line x1="370" y1="365" x2="439" y2="365" stroke="var(--m-rose-ink, #b0344d)" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#fig-p3-s5-head-rose)"/>
+  <text x="20" y="412" font-size="11" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">Each stage starts only if the one above succeeded. Rollback is the previous sha- tag (Sprint 6).</text>
+</svg>
