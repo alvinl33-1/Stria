@@ -39,6 +39,19 @@ expect() {
 json=(-H 'Content-Type: application/json')
 key=(-H "X-Stria-Service-Key: ${STRIA_PAYMENTGATEWAY_KEY}")
 
+# `docker compose up -d` returns once the container starts, before Kestrel listens. Wait for
+# readiness so a fresh stack isn't reported as broken.
+ready_timeout="${STRIA_READY_TIMEOUT:-60}"
+waited=0
+until [[ "$(curl -s -o /dev/null -w '%{http_code}' "$STRIA_URL/readyz" || true)" == "200" ]]; do
+  if (( waited >= ready_timeout )); then
+    echo "Stria was not ready at $STRIA_URL/readyz after ${ready_timeout}s." >&2
+    exit 1
+  fi
+  sleep 1
+  waited=$((waited + 1))
+done
+
 echo "== Health"
 expect "GET /healthz" 200 -- "$STRIA_URL/healthz"
 expect "GET /readyz" 200 -- "$STRIA_URL/readyz"

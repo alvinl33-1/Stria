@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 410" role="img" aria-labelledby="fig-p3-s3-title fig-p3-s3-desc" font-family="JetBrains Mono, ui-monospace, monospace" fill="var(--m-ink, #1a1a1a)">
+  <title id="fig-p3-s3-title">Sprint 3: infra/main.bicep describes every resource in rg-stria-demo</title>
+  <desc id="fig-p3-s3-desc">The resource group rg-stria-demo, from infra/main.bicep and azure.yaml, owns three groups. Shared: managed identity, ACR Basic, Key Vault and the storage account. Data and operations: PostgreSQL Flexible Server, Log Analytics, App Insights and a budget alert. Container Apps environment: stria-server, sample-payment-gateway and the migration job. All are dashed because none exists yet.</desc>
+  <rect x="0" y="0" width="640" height="410" fill="var(--m-panel, #f3f1e8)"/>
+  <text x="20" y="18" font-size="11" letter-spacing="1.2" fill="var(--m-ink-mute, #6f6f6a)">SPRINT 3 · INFRASTRUCTURE AS CODE · BICEP BUILD IN CI</text>
+  <rect x="160" y="30" width="320" height="44" fill="var(--m-violet-fill, #ebe8f5)" stroke="var(--m-violet-ink, #5b4fa3)"/>
+  <text x="320" y="50" font-size="12.5" text-anchor="middle" font-weight="700">rg-stria-demo</text>
+  <text x="320" y="64" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">infra/main.bicep + azure.yaml</text>
+  <line x1="320" y1="74" x2="28" y2="106" stroke="var(--m-ink-mute, #6f6f6a)" stroke-width="1"/>
+  <text x="20" y="120" font-size="11" letter-spacing="1.2" fill="var(--m-ink-mute, #6f6f6a)">SHARED</text>
+  <line x1="28" y1="126" x2="28" y2="328" stroke="var(--m-ink-mute, #6f6f6a)" stroke-width="1"/>
+  <line x1="28" y1="154" x2="39" y2="154" stroke="var(--m-ink-mute, #6f6f6a)" stroke-width="1"/>
+  <rect x="40" y="132" width="160" height="44" fill="var(--m-violet-fill, #ebe8f5)" stroke="var(--m-violet-ink, #5b4fa3)" stroke-dasharray="5 4"/>
+  <text x="120" y="152" font-size="12.5" text-anchor="middle" font-weight="700">Managed identity</text>
+  <text x="120" y="166" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">roles on ACR, KV, Blob</text>
+  <line x1="28" y1="212" x2="39" y2="212" stroke="var(--m-ink-mute, #6f6f6a)" stroke-width="1"/>
+  <rect x="40" y="190" width="160" height="44" fill="var(--m-teal-fill, #e1efee)" stroke="var(--m-teal-ink, #18696a)" stroke-dasharray="5 4"/>
+  <text x="120" y="210" font-size="12.5" text-anchor="middle" font-weight="700">ACR Basic</text>
+  <text x="120" y="224" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">sha- tagged images</text>
+  <line x1="28" y1="270" x2="39" y2="270" stroke="var(--m-ink-mute, #6f6f6a)" stroke-width="1"/>
+  <rect x="40" y="248" width="160" height="44" fill="var(--m-teal-fill, #e1efee)" stroke="var(--m-teal-ink, #18696a)" stroke-dasharray="5 4"/>
+  <text x="120" y="268" font-size="12.5" text-anchor="middle" font-weight="700">Key Vault (RBAC)</text>
+  <text x="120" y="282" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">secrets + DP key</text>
+  <line x1="28" y1="328" x2="39" y2="328" stroke="var(--m-ink-mute, #6f6f6a)" stroke-width="1"/>
+  <rect x="40" y="306" width="160" height="44" fill="var(--m-teal-fill, #e1efee)" stroke="var(--m-teal-ink, #18696a)" stroke-dasharray="5 4"/>
+  <text x="120" y="326" font-size="12.5" text-anchor="middle" font-weight="700">Storage account</text>
+  <text x="120" y="340" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">dpkeys container</text>
+  <line x1="320" y1="74" x2="218" y2="106" stroke="var(--m-ink-mute, #6f6f6a)" stroke-width="1"/>
+  <text x="210" y="120" font-size="11" letter-spacing="1.2" fill="var(--m-ink-mute, #6f6f6a)">DATA AND OPERATIONS</text>
+  <line x1="218" y1="126" x2="218" y2="328" stroke="var(--m-ink-mute, #6f6f6a)" stroke-width="1"/>
+  <line x1="218" y1="154" x2="229" y2="154" stroke="var(--m-ink-mute, #6f6f6a)" stroke-width="1"/>
+  <rect x="230" y="132" width="160" height="44" fill="var(--m-teal-fill, #e1efee)" stroke="var(--m-teal-ink, #18696a)" stroke-dasharray="5 4"/>
+  <text x="310" y="152" font-size="12.5" text-anchor="middle" font-weight="700">PostgreSQL Flex</text>
+  <text x="310" y="166" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">B1ms, Entra auth</text>
+  <line x1="218" y1="212" x2="229" y2="212" stroke="var(--m-ink-mute, #6f6f6a)" stroke-width="1"/>
+  <rect x="230" y="190" width="160" height="44" fill="var(--m-indigo-fill, #e9e9f6)" stroke="var(--m-indigo-ink, #4b4f9e)" stroke-dasharray="5 4"/>
+  <text x="310" y="210" font-size="12.5" text-anchor="middle" font-weight="700">Log Analytics</text>
+  <text x="310" y="224" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">container logs</text>
+  <line x1="218" y1="270" x2="229" y2="270" stroke="var(--m-ink-mute, #6f6f6a)" stroke-width="1"/>
+  <rect x="230" y="248" width="160" height="44" fill="var(--m-indigo-fill, #e9e9f6)" stroke="var(--m-indigo-ink, #4b4f9e)" stroke-dasharray="5 4"/>
+  <text x="310" y="268" font-size="12.5" text-anchor="middle" font-weight="700">App Insights</text>
+  <text x="310" y="282" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">traces from Stria</text>
+  <line x1="218" y1="328" x2="229" y2="328" stroke="var(--m-ink-mute, #6f6f6a)" stroke-width="1"/>
+  <rect x="230" y="306" width="160" height="44" fill="var(--m-olive-fill, #eef0dc)" stroke="var(--m-olive-ink, #515f26)" stroke-dasharray="5 4"/>
+  <text x="310" y="326" font-size="12.5" text-anchor="middle" font-weight="700">Budget alert</text>
+  <text x="310" y="340" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">emails at 50%, 90%</text>
+  <line x1="320" y1="74" x2="408" y2="106" stroke="var(--m-ink-mute, #6f6f6a)" stroke-width="1"/>
+  <text x="400" y="120" font-size="11" letter-spacing="1.2" fill="var(--m-ink-mute, #6f6f6a)">CONTAINER APPS ENV</text>
+  <line x1="408" y1="126" x2="408" y2="270" stroke="var(--m-ink-mute, #6f6f6a)" stroke-width="1"/>
+  <line x1="408" y1="154" x2="419" y2="154" stroke="var(--m-ink-mute, #6f6f6a)" stroke-width="1"/>
+  <rect x="420" y="132" width="200" height="44" fill="var(--m-blue-fill, #e6edf6)" stroke="var(--m-blue-ink, #2f5d9a)" stroke-dasharray="5 4"/>
+  <text x="520" y="152" font-size="12.5" text-anchor="middle" font-weight="700">stria-server</text>
+  <text x="520" y="166" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">external HTTPS, max 1</text>
+  <line x1="408" y1="212" x2="419" y2="212" stroke="var(--m-ink-mute, #6f6f6a)" stroke-width="1"/>
+  <rect x="420" y="190" width="200" height="44" fill="var(--m-blue-fill, #e6edf6)" stroke="var(--m-blue-ink, #2f5d9a)" stroke-dasharray="5 4"/>
+  <text x="520" y="210" font-size="12.5" text-anchor="middle" font-weight="700">sample-payment-gateway</text>
+  <text x="520" y="224" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">internal ingress only</text>
+  <line x1="408" y1="270" x2="419" y2="270" stroke="var(--m-ink-mute, #6f6f6a)" stroke-width="1"/>
+  <rect x="420" y="248" width="200" height="44" fill="var(--m-amber-fill, #f5ecd9)" stroke="var(--m-amber-ink, #85590c)" stroke-dasharray="5 4"/>
+  <text x="520" y="268" font-size="12.5" text-anchor="middle" font-weight="700">migration job</text>
+  <text x="520" y="282" font-size="11" text-anchor="middle" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">manual, before each release</text>
+  <text x="20" y="386" font-size="11" class="m-serif" font-family="'Source Serif 4', Georgia, serif" fill="var(--m-ink-soft, #4a4a4a)">Dashed: described in Bicep and linted in CI, but not created until the Sprint 4 authorization.</text>
+</svg>
