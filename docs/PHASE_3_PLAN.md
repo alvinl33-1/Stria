@@ -1,7 +1,9 @@
 # Stria Phase 3 Plan — Hosted Demo on Azure Container Apps
 
-**Status:** Step 1 built on 2026-11-18 (139 tests). Step 2 is next. Prepared on 2026-11-18 after
-Phase 2 closed ([PHASE_2_HANDOFF.md](PHASE_2_HANDOFF.md)).
+**Status (2026-11-19):** Steps 1 and 2 are built and green in CI, in PRs #23 and #24 (not merged
+yet). Step 3 is in progress: the `Program.cs` refactor and the Bicep foundation pass their local
+checks (158 tests; `bicep build`/`lint` clean). Prepared on 2026-11-18 after Phase 2 closed
+([PHASE_2_HANDOFF.md](PHASE_2_HANDOFF.md)).
 
 **Authorization gate:** Steps 1–3 below change only code, CI and documentation and need no Azure
 account. **Step 4 onward creates billable Azure resources and must not start until Alvin explicitly
@@ -114,12 +116,20 @@ migrations bundle to an empty PostgreSQL twice, and scans every image with Trivy
 digest), failing on fixable HIGH/CRITICAL findings. SARIF goes to code scanning from `main`.
 The bundle builds its context with `Data/StriaDbContextDesignTimeFactory.cs` and is configured
 like the app: `ConnectionStrings__Stria`, plus `Database__UseEntraAuth=true` in Azure.
-Nothing is pushed; that is Step 5.
+Nothing is pushed; that is Step 5. The first scan found no fixable HIGH/CRITICAL issues in any
+image, so `.trivyignore` is empty. Trivy sees only the OS layer of `stria-migrator`: the
+single-file bundle carries no `deps.json`, so its NuGet packages are covered by
+`dependency-audit` instead.
 
 ### Step 3 — Infrastructure as code, no Azure needed until deploy
 
-- `infra/main.bicep` with modules for the resource set in §3, `infra/main.parameters.json`
-  (no secrets), and `azure.yaml` for `azd`.
+- **Endpoint and service modules (refactor, no behaviour change):** routes move from `Program.cs`
+  into `Endpoints/` (health, authentication, control plane, data plane) with named handlers and
+  `TypedResults`; startup checks move into `Security/StartupValidation.cs`; persistence and
+  authentication setup move into `AddStria…` extensions.
+- `infra/main.bicep` with modules for the resource set in §3, `infra/main.bicepparam`
+  (no secrets; typed, so `bicep build-params` rejects a misspelled or mistyped parameter), and
+  `azure.yaml` for `azd`.
 - `bicep build` in CI (lint only; no Azure login needed).
 - Budget alert resource on the resource group.
 - README "Deploy to Azure" section: prerequisites, one-time setup, deploy, verify, rollback,
@@ -127,6 +137,23 @@ Nothing is pushed; that is Step 5.
 
 **Acceptance:** `bicep build` is clean in CI; a reviewer can read exactly what will be created
 and what it costs before anything is deployed.
+
+**Progress (2026-11-19):**
+
+| Ticket | State | Evidence |
+|---|---|---|
+| 3.0a Endpoint modules | Committed (`d0a3fbb`, branch `phase-3/endpoint-modules`) | 155 tests; route metadata identical to the old `Program.cs` |
+| 3.0b Service-registration modules | Written, not committed | 158 tests; moved auth code and all five startup messages identical to the originals |
+| 3.1 Bicep foundation | Written, not committed (`infra/`) | `az bicep build`, `build-params` and `lint` clean, offline |
+| 3.2 Data and compute modules | Next | — |
+| 3.3 `azure.yaml`, budget, CI lint job | To do | — |
+| 3.4 README "Deploy to Azure" | To do | — |
+
+3.1 covers the identity, Log Analytics (1 GB/day cap) with App Insights, ACR Basic, Key Vault
+(RBAC, 7-day soft delete, no purge protection) with the Data Protection key, and storage with
+shared keys off and a `dpkeys` container. The app identity's roles are scoped as narrowly as each
+use allows: AcrPull on the registry, Secrets User on the vault, Crypto Service Encryption User on
+the one key, Blob Data Contributor on the one container.
 
 ### Step 4 — Provision (requires authorization)
 

@@ -1,8 +1,9 @@
 # Phase 3 Sprints, in Figures
 
 One figure per sprint of [PHASE_3_PLAN.md](PHASE_3_PLAN.md). **Status (2026-11-19):** Sprint 0 is
-done. Sprint 1 is built and verified, but not committed yet. Sprints 2 and 3 need no Azure account.
-Sprints 4 to 6 need written authorization first.
+done. Sprints 1 and 2 are green in CI in PRs #23 and #24, waiting to merge. Sprint 3 is in progress
+(see the plan's Step 3 progress table). Sprints 2 and 3 need no Azure account. Sprints 4 to 6 need
+written authorization first.
 
 The figures are built by `node docs/figures/src/phase-3-sprints.mjs`. Edit the script, not the SVGs.
 
@@ -32,7 +33,7 @@ The figures are built by `node docs/figures/src/phase-3-sprints.mjs`. Edit the s
 fails with 000.** Read top to bottom; numbers give the order. Source: `scripts/compose-smoke.sh` and
 the 2026-11-18 baseline run.
 
-## Sprint 1 — Cloud-ready code (built, uncommitted)
+## Sprint 1 — Cloud-ready code (PR #23, green)
 
 ![Sprint 1: each Azure behaviour is a setting; Compose leaves them unset](figures/phase-3/fig-p3-s1.svg)
 
@@ -41,20 +42,23 @@ refuses to start.** Read each row from left (Compose) to right (Azure). Source: 
 `Security/DataProtectionSetup.cs`, `Data/StriaDataSource.cs`, `Security/AzureRuntimeSettings.cs` and
 `Services/StriaTelemetry.cs`.
 
-## Sprint 2 — Release artifacts in CI (next)
+## Sprint 2 — Release artifacts in CI (PR #24, green)
 
 ![Sprint 2: CI builds scanned, SHA-tagged images and a migration bundle](figures/phase-3/fig-p3-s2.svg)
 
 **Every commit becomes amd64 images tagged with its SHA, scanned by Trivy, plus a tested
-migration bundle. Nothing is pushed from a PR.** Read top to bottom. Source: PHASE_3_PLAN.md, Step 2.
+migration bundle. Nothing is pushed from a PR.** Read top to bottom. Source: the `container-build`
+job in `.github/workflows/ci.yml` and the `bundle`/`migrator` stages of `Stria.API/Dockerfile`.
 
-## Sprint 3 — Infrastructure as code
+## Sprint 3 — Infrastructure as code (in progress)
 
 ![Sprint 3: infra/main.bicep describes every resource in rg-stria-demo](figures/phase-3/fig-p3-s3.svg)
 
 **Bicep describes every Azure resource before any of them exists, so their cost and access can be
 reviewed first.** Read from the resource group down. Dashed borders mean planned, not created.
-Source: PHASE_3_PLAN.md, section 3.
+Source: PHASE_3_PLAN.md, section 3. The foundation modules (identity, monitoring, registry, Key Vault,
+storage) are written in `infra/`; PostgreSQL, the environment, the apps and the job come next. The
+sprint opens with a `Program.cs` refactor (ticket 3.0) that the figure doesn't show.
 
 ## Sprint 4 — Provision (requires authorization)
 
