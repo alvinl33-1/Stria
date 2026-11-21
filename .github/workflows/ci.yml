@@ -141,6 +141,59 @@ jobs:
           fail-on-severity: high
           comment-summary-in-pr: never
 
+  # Compiles, lints and format-checks infra/ with no Azure login: none of it calls Azure.
+  infra-validate:
+    name: infra-validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BICEP_VERSION: v0.49.2
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The runner image has its own bicep on PATH, which az prefers in CI by default. Turn that
+      # off so the pinned version is the one that runs.
+      - name: Install Bicep ${{ env.BICEP_VERSION }}
+        run: |
+          az config set bicep.use_binary_from_path=false --only-show-errors
+          az bicep install --version "$BICEP_VERSION"
+          az bicep version
+
+      - name: Compile templates and parameters
+        run: |
+          az bicep build --file infra/main.bicep --stdout > /dev/null
+          az bicep build-params --file infra/main.bicepparam --stdout > /dev/null
+          # The second provision (apps on) and a budget must resolve too.
+          STRIA_DEPLOY_APPS=true STRIA_IMAGE_TAG=sha-ci STRIA_BUDGET_START_DATE=2026-12-01 \
+            az bicep build-params --file infra/main.bicepparam --stdout > /dev/null
+
+      # az bicep lint exits 0 on warnings, so count the SARIF findings instead. Each one becomes
+      # an ::error annotation on the PR's changed line.
+      - name: Lint with warnings as errors
+        run: |
+          az bicep lint --file infra/main.bicep --diagnostics-format sarif > bicep-lint.sarif
+          count=$(jq '[.runs[].results[]] | length' bicep-lint.sarif)
+          if [ "$count" -ne 0 ]; then
+            jq -r --arg root "file://$GITHUB_WORKSPACE/" '.runs[].results[]
+              | .locations[0].physicalLocation as $l
+              | "::error file=\($l.artifactLocation.uri | ltrimstr($root)),line=\($l.region.startLine)::\(.ruleId): \(.message.text)"' bicep-lint.sarif
+            exit 1
+          fi
+          echo "bicep lint: no findings"
+
+      # Like dotnet format --verify-no-changes: format into a scratch copy and diff. --outdir,
+      # because --stdout adds a trailing newline that would make every file look unformatted.
+      - name: Verify formatting
+        run: |
+          for f in infra/main.bicep infra/modules/*.bicep; do
+            az bicep format --file "$f" --outdir "$RUNNER_TEMP/fmt/$(dirname "$f")" --only-show-errors
+          done
+          if ! diff -ru --exclude='*.bicepparam' infra "$RUNNER_TEMP/fmt/infra"; then
+            echo "::error::infra/ is not formatted. Run: az bicep format --file <file> for each file above."
+            exit 1
+          fi
+
   container-build:
     name: container-build
     runs-on: ubuntu-latest

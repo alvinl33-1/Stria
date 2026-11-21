@@ -4,6 +4,8 @@
 !.env.example
 !.env.*.example
 
+# azd environments (.azure/<env>/.env): subscription, resource names, budget email. Per machine.
+.azure/
 
 # .NET build output
 **/bin/

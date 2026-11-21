@@ -1,29 +1,43 @@
 // Stria hosted demo: one resource group, created and torn down as a unit (PHASE_3_PLAN.md §3).
 // Nothing here is provisioned until Sprint 4 is authorized in writing.
 targetScope = 'resourceGroup'
+
 @description('Short environment name used in resource names and the azd-env-name tag.')
 @minLength(2)
 @maxLength(12)
-
 param environmentName string = 'demo'
-@description('Region for every resource.')
 
+@description('Region for every resource.')
 param location string = resourceGroup().location
+
 @description('Object ID of the operator who stores secrets during one-time setup (Sprint 4). Empty skips the assignment.')
 param operatorPrincipalId string = ''
+
+@description('Entra tenant that signs users in (the test tenant). Not secret.')
+param entraTenantId string = ''
+
+@description('Client ID of the Stria app registration. Not secret.')
+param entraClientId string = ''
+
+@description('Image tag for all three images: sha-<commit> from CI (Sprint 2). Never latest.')
+param imageTag string = ''
+
+@description('False on the first provision: the apps need images in ACR and secrets in Key Vault first (Sprint 4).')
+param deployApps bool = false
+
+@description('Monthly cost budget in the billing currency. The amount is decided at the Sprint 4 gate (PHASE_3_PLAN.md §5).')
+param budgetAmount int = 20
+
+@description('First day of the first budget month, yyyy-MM-01. Empty skips the budget, as in CI and offline builds.')
+param budgetStartDate string = ''
+
+@description('Optional extra address for budget alerts. Resource group Owners are always notified.')
+param budgetContactEmail string = ''
+
 var tags = {
   'azd-env-name': environmentName
   project: 'stria'
 }
-
-@description('Entra tenant that signs users in (the test tenant). Not secret.')
-param entraTenantId string = ''
-@description('Client ID of the Stria app registration. Not secret.')
-param entraClientId string = ''
-@description('Image tag for all three images: sha-<commit> from CI (Sprint 2). Never latest.')
-param imageTag string = ''
-@description('False on the first provision: the apps need images in ACR and secrets in Key Vault first (Sprint 4).')
-param deployApps bool = false
 
 // Registry, vault and storage names are global DNS names. uniqueString is deterministic, so the
 // same resource group always gets the same names and redeploying never creates duplicates.
@@ -40,7 +54,7 @@ module identity 'modules/identity.bicep' = {
 
 module monitoring 'modules/monitoring.bicep' = {
   name: 'monitoring'
-    params: {
+  params: {
     workspaceName: 'log-stria-${environmentName}'
     appInsightsName: 'appi-stria-${environmentName}'
     location: location
@@ -78,6 +92,7 @@ module storage 'modules/storage.bicep' = {
     appPrincipalId: identity.outputs.principalId
   }
 }
+
 module postgres 'modules/postgres.bicep' = {
   name: 'postgres'
   params: {
@@ -149,6 +164,16 @@ module migrate 'modules/migrate.bicep' = if (deployApps) {
     registryServer: registry.outputs.loginServer
     image: '${registry.outputs.loginServer}/stria-migrator:${imageTag}'
     connectionString: connectionString
+  }
+}
+
+module budget 'modules/budget.bicep' = if (!empty(budgetStartDate)) {
+  name: 'budget'
+  params: {
+    name: 'budget-stria-${environmentName}'
+    amount: budgetAmount
+    startDate: budgetStartDate
+    contactEmail: budgetContactEmail
   }
 }
 
