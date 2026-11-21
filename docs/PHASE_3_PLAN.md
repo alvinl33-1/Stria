@@ -1,9 +1,9 @@
 # Stria Phase 3 Plan — Hosted Demo on Azure Container Apps
 
-**Status (2026-11-20):** Steps 1 and 2 are merged (#23, #24). Step 3's code is merged (#25–#28):
-the `Program.cs` refactor, every Bicep module, `azure.yaml`, the budget and the required
-`infra-validate` CI job. Left in Step 3: the README "Deploy to Azure" section (3.4). Nothing is
-provisioned. Prepared on 2026-11-18 after Phase 2 closed
+**Status (2026-11-20):** Steps 1–3 are complete (#23–#30): cloud-ready code, release artifacts,
+the `Program.cs` refactor, every Bicep module, `azure.yaml`, the budget, the required
+`infra-validate` CI job and the README "Deploy to Azure" runbook. The API image runs unprivileged
+(ticket 4.0). Nothing is provisioned: Step 4 waits for the §5 decisions in writing. Prepared on 2026-11-18 after Phase 2 closed
 ([PHASE_2_HANDOFF.md](PHASE_2_HANDOFF.md)); see "Before Step 4" at the end of Step 3.
 
 **Authorization gate:** Steps 1–3 below change only code, CI and documentation and need no Azure
@@ -151,7 +151,7 @@ single-file bundle carries no `deps.json`, so its NuGet packages are covered by
 **Acceptance:** `bicep build` is clean in CI; a reviewer can read exactly what will be created
 and what it costs before anything is deployed.
 
-**Progress (2026-11-20):** Step 3's code is complete except the README section.
+**Progress (2026-11-20):** Step 3 is complete.
 
 | Ticket | State | Evidence |
 |---|---|---|
@@ -159,7 +159,7 @@ and what it costs before anything is deployed.
 | 3.1 Bicep foundation | Merged #26 | `az bicep build`, `build-params` and `lint` clean, offline |
 | 3.2 PostgreSQL, environment, apps, migrate job | Merged #27 | Same gates; networking deviation recorded in §3 |
 | 3.3 `azure.yaml`, budget, CI `infra-validate` job | Merged #28 | `infra-validate` (build, params ×2, lint with warnings as errors, format) is a required check |
-| 3.4 README "Deploy to Azure" | Next | — |
+| 3.4 README "Deploy to Azure" | Merged #30 | Every name checked against `infra/`, every `az` command against CLI 2.93; the runbook itself runs first in Step 4 |
 
 3.1 covers the identity, Log Analytics (1 GB/day cap) with App Insights, ACR Basic, Key Vault
 (RBAC, 7-day soft delete, no purge protection) with the Data Protection key, and storage with
@@ -186,7 +186,7 @@ parameters, fails on any lint finding and checks formatting. It is a required ch
 
 | Item | Why it matters | When |
 |---|---|---|
-| `stria-api` final image runs as root | A hosted container should run unprivileged. Fixing it needs the Compose key volume's ownership handled too | Small PR before Step 4 |
+| ~~`stria-api` final image runs as root~~ | Fixed in ticket 4.0: `USER $APP_UID`, key directory owned by `app`; CI asserts non-root and a written key ring | Done |
 | One identity for the app and the migration job | The app gets DDL rights it doesn't need | Decide in Step 4 (second identity or a DML-only role) |
 | Bicep declares the image tag | Re-provisioning with an old `STRIA_IMAGE_TAG` would roll the apps back | Step 5: CI always passes the current tag |
 | Not verified offline | That azd reads `main.bicepparam`, and that the budget accepts a date-only `startDate` | `azd provision --preview` in Step 4 |

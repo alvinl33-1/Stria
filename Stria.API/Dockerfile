@@ -39,4 +39,9 @@ ENTRYPOINT ["./efbundle"]
 FROM runtime AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+# Run unprivileged, as the base image's `app` user. The key ring directory must already exist and
+# belong to that user: the app can't create it under root-owned /var/lib, and a new named volume
+# copies this owner and mode on first mount. 700, because the keys decrypt every auth cookie.
+RUN install -d -o "$APP_UID" -g "$APP_UID" -m 700 /var/lib/stria/dpkeys
+USER $APP_UID
 ENTRYPOINT ["dotnet", "Stria.dll"]

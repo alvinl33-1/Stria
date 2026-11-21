@@ -240,6 +240,13 @@ jobs:
           if [ -z "$asset" ]; then echo "::error::Page does not reference _framework/blazor.web.js"; docker logs stria-api-probe; exit 1; fi
           curl -sf -o /dev/null "http://localhost:18080/$asset" || { echo "::error::$asset is not served by the image"; docker logs stria-api-probe; exit 1; }
           echo "Served $asset"
+          # Runs unprivileged, and can write its key ring. An unwritable key ring fails silently
+          # (pages still load; keys don't persist), so check for the key file the page just created.
+          uid=$(docker exec stria-api-probe id -u)
+          [ "$uid" != 0 ] || { echo "::error::stria-api runs as root"; exit 1; }
+          docker exec stria-api-probe sh -c 'ls /var/lib/stria/dpkeys/key-*.xml' > /dev/null \
+            || { echo "::error::No Data Protection key in /var/lib/stria/dpkeys"; docker logs stria-api-probe; exit 1; }
+          echo "Runs as UID $uid; key ring written"
 
       - name: Stop control-plane probe
         if: always()
