@@ -1,8 +1,7 @@
 # Phase 3 Sprints, in Figures
 
-One figure per sprint of [PHASE_3_PLAN.md](PHASE_3_PLAN.md). **Status (2026-11-20):** Sprints 0–2 are
-done (#23, #24). Sprint 3's code is merged (#25–#28); only the README "Deploy to Azure" section
-(3.4) is left (see the plan's Step 3 progress table). Sprints 2 and 3 need no Azure account. Sprints 4 to 6 need
+One figure per sprint of [PHASE_3_PLAN.md](PHASE_3_PLAN.md). **Status (2026-11-20):** Sprints 0–3 are
+done (#23–#30; see the plan's Step 3 progress table). Sprint 4 waits for written authorization. Sprints 2 and 3 need no Azure account. Sprints 4 to 6 need
 written authorization first.
 
 The figures are built by `node docs/figures/src/phase-3-sprints.mjs`. Edit the script, not the SVGs.
@@ -50,7 +49,7 @@ refuses to start.** Read each row from left (Compose) to right (Azure). Source: 
 migration bundle. Nothing is pushed from a PR.** Read top to bottom. Source: the `container-build`
 job in `.github/workflows/ci.yml` and the `bundle`/`migrator` stages of `Stria.API/Dockerfile`.
 
-## Sprint 3 — Infrastructure as code (code merged; README next)
+## Sprint 3 — Infrastructure as code (done)
 
 ![Sprint 3: infra/main.bicep describes every resource in rg-stria-demo](figures/phase-3/fig-p3-s3.svg)
 
