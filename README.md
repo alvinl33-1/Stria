@@ -246,7 +246,8 @@ GitHub Actions runs on pushes and pull requests to `main`:
 | `build-and-test` | Formatting is clean, the Release build has no warnings, all tests pass, and TRX/coverage evidence is uploaded |
 | `dependency-audit` | No known vulnerable direct or transitive NuGet packages are referenced |
 | `dependency-review` | A pull request does not introduce high-severity vulnerable dependencies (public repositories; private repositories need GitHub Advanced Security) |
-| `container-build` | Builds the control-plane, migration-job, standalone dashboard and sample-service images for `linux/amd64`, tagged `sha-<commit>` (never `latest`). The control-plane image starts in Production mode and serves the Blazor script its pages reference; the migrations bundle brings an empty PostgreSQL to the latest migration and is a no-op on a second run; Trivy fails the job on fixable HIGH/CRITICAL findings in any image (accepted findings go in `.trivyignore`) |
+| `container-build` | Builds the control-plane, migration-job and sample-service images for `linux/amd64`, tagged `sha-<commit>` (never `latest`). The control-plane image starts in Production mode and serves the Blazor script its pages reference; the migrations bundle brings an empty PostgreSQL to the latest migration and is a no-op on a second run; Trivy fails the job on fixable HIGH/CRITICAL findings in any image (accepted findings go in `.trivyignore`) |
+| `infra-validate` | `infra/` compiles with the pinned Bicep version (template, and the parameters file with and without the apps and budget), has no lint findings (warnings count), and is formatted (`az bicep format`). Needs no Azure login |
 
 Integration tests use Testcontainers and PostgreSQL. CI sets `STRIA_REQUIRE_DOCKER_TESTS=true`, so the job fails rather than silently skipping PostgreSQL coverage when Docker cannot start. Dependabot checks NuGet packages, GitHub Actions, and Docker base images weekly.
 
@@ -259,7 +260,16 @@ dotnet build Stria.sln --configuration Release --no-restore -warnaserror
 dotnet test Stria.sln --configuration Release --no-build
 ```
 
-`main` branch protection requires `build-and-test`, `dependency-audit`, `dependency-review`, and `container-build`. `dependency-review` needs a public repository (or GitHub Advanced Security); drop it from the required checks if the repository becomes private. Administrators can bypass these rules; do not use that bypass for normal changes.
+And the infrastructure gates (Azure CLI with Bicep, no login):
+
+```sh
+az bicep build --file infra/main.bicep --stdout > /dev/null
+az bicep build-params --file infra/main.bicepparam --stdout > /dev/null
+az bicep lint --file infra/main.bicep --diagnostics-format sarif > /tmp/bicep-lint.sarif
+jq '[.runs[].results[]] | length' /tmp/bicep-lint.sarif   # 0 findings
+```
+
+`main` branch protection requires `build-and-test`, `dependency-audit`, `dependency-review`, `container-build`, and `infra-validate`, and branches must be up to date with `main` before merging. `dependency-review` needs a public repository (or GitHub Advanced Security); drop it from the required checks if the repository becomes private. Administrators can bypass these rules; do not use that bypass for normal changes.
 
 The Phase 2 security plan is in [docs/PHASE_2_PLAN.md](docs/PHASE_2_PLAN.md); its evidence is in [docs/PHASE_2_HANDOFF.md](docs/PHASE_2_HANDOFF.md). Phase 3 (hosted demo on Azure Container Apps) is planned in [docs/PHASE_3_PLAN.md](docs/PHASE_3_PLAN.md), with one figure per sprint in [docs/PHASE_3_SPRINTS.md](docs/PHASE_3_SPRINTS.md); the infrastructure is described, not yet provisioned, in `infra/`.
 

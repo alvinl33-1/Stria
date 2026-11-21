@@ -1,9 +1,10 @@
 # Stria Phase 3 Plan — Hosted Demo on Azure Container Apps
 
-**Status (2026-11-19):** Steps 1 and 2 are built and green in CI, in PRs #23 and #24 (not merged
-yet). Step 3 is in progress: the `Program.cs` refactor and the Bicep foundation pass their local
-checks (158 tests; `bicep build`/`lint` clean). Prepared on 2026-11-18 after Phase 2 closed
-([PHASE_2_HANDOFF.md](PHASE_2_HANDOFF.md)).
+**Status (2026-11-20):** Steps 1 and 2 are merged (#23, #24). Step 3's code is merged (#25–#28):
+the `Program.cs` refactor, every Bicep module, `azure.yaml`, the budget and the required
+`infra-validate` CI job. Left in Step 3: the README "Deploy to Azure" section (3.4). Nothing is
+provisioned. Prepared on 2026-11-18 after Phase 2 closed
+([PHASE_2_HANDOFF.md](PHASE_2_HANDOFF.md)); see "Before Step 4" at the end of Step 3.
 
 **Authorization gate:** Steps 1–3 below change only code, CI and documentation and need no Azure
 account. **Step 4 onward creates billable Azure resources and must not start until Alvin explicitly
@@ -120,10 +121,12 @@ allowed for other proxies. App Insights is optional.
 **Acceptance:** CI produces a scanned, SHA-tagged image set and a migration bundle on every push
 to `main`.
 
-**As built (2026-11-19):** `container-build` builds four `linux/amd64` images tagged
-`sha-<commit>` (`stria-api`, `stria-migrator`, `stria-client`, `stria-sample`), applies the
+**As built (2026-11-19):** `container-build` builds `linux/amd64` images tagged
+`sha-<commit>` (`stria-api`, `stria-migrator`, `stria-sample`), applies the
 migrations bundle to an empty PostgreSQL twice, and scans every image with Trivy (pinned by
 digest), failing on fixable HIGH/CRITICAL findings. SARIF goes to code scanning from `main`.
+A fourth image, `stria-client` (the dashboard on nginx), was removed on 2026-11-20: nothing
+deployed it, because `stria-api` serves the WebAssembly client itself.
 The bundle builds its context with `Data/StriaDbContextDesignTimeFactory.cs` and is configured
 like the app: `ConnectionStrings__Stria`, plus `Database__UseEntraAuth=true` in Azure.
 Nothing is pushed; that is Step 5. The first scan found no fixable HIGH/CRITICAL issues in any
@@ -148,22 +151,47 @@ single-file bundle carries no `deps.json`, so its NuGet packages are covered by
 **Acceptance:** `bicep build` is clean in CI; a reviewer can read exactly what will be created
 and what it costs before anything is deployed.
 
-**Progress (2026-11-19):**
+**Progress (2026-11-20):** Step 3's code is complete except the README section.
 
 | Ticket | State | Evidence |
 |---|---|---|
-| 3.0a Endpoint modules | Committed (`d0a3fbb`, branch `phase-3/endpoint-modules`) | 155 tests; route metadata identical to the old `Program.cs` |
-| 3.0b Service-registration modules | Written, not committed | 158 tests; moved auth code and all five startup messages identical to the originals |
-| 3.1 Bicep foundation | Written, not committed (`infra/`) | `az bicep build`, `build-params` and `lint` clean, offline |
-| 3.2 Data and compute modules | Next | — |
-| 3.3 `azure.yaml`, budget, CI lint job | To do | — |
-| 3.4 README "Deploy to Azure" | To do | — |
+| 3.0a/b Endpoint and service modules | Merged #25 | 158 tests; route metadata and startup messages identical to the old `Program.cs` |
+| 3.1 Bicep foundation | Merged #26 | `az bicep build`, `build-params` and `lint` clean, offline |
+| 3.2 PostgreSQL, environment, apps, migrate job | Merged #27 | Same gates; networking deviation recorded in §3 |
+| 3.3 `azure.yaml`, budget, CI `infra-validate` job | Merged #28 | `infra-validate` (build, params ×2, lint with warnings as errors, format) is a required check |
+| 3.4 README "Deploy to Azure" | Next | — |
 
 3.1 covers the identity, Log Analytics (1 GB/day cap) with App Insights, ACR Basic, Key Vault
 (RBAC, 7-day soft delete, no purge protection) with the Data Protection key, and storage with
 shared keys off and a `dpkeys` container. The app identity's roles are scoped as narrowly as each
 use allows: AcrPull on the registry, Secrets User on the vault, Crypto Service Encryption User on
 the one key, Blob Data Contributor on the one container.
+
+3.2 adds PostgreSQL Flexible Server (B1ms, Entra-only, the Azure-services firewall rule, database
+`stria`), the Container Apps environment logging to the workspace, `stria-server` (external HTTPS,
+0–1 replicas, startup/liveness probes on `/healthz` and readiness on `/readyz`), the internal-only
+`sample-payment-gateway`, and the manual `stria-migrate` job (EF bundle, no retries, 10-minute
+timeout). Secrets are Key Vault references through the shared identity, and the connection string
+has no password (`Ssl Mode=VerifyFull`). `deployApps` (`STRIA_DEPLOY_APPS`, default false) leaves
+the apps and the job out of the first provision, because they need images in ACR and secrets in
+Key Vault first.
+
+3.3 adds `azure.yaml` (infra only; images stay CI-built and CI-deployed), a `.azure/` gitignore
+entry, and a monthly budget alerting resource-group Owners at 50% and 90% actual and 100% forecast
+spend. Its start date (`STRIA_BUDGET_START_DATE`) is set once, because Azure rejects any change to
+it; empty skips the budget. The `infra-validate` job pins Bicep, compiles the template and the
+parameters, fails on any lint finding and checks formatting. It is a required check.
+
+**Before Step 4** (open items, none blocking 3.4):
+
+| Item | Why it matters | When |
+|---|---|---|
+| `stria-api` final image runs as root | A hosted container should run unprivileged. Fixing it needs the Compose key volume's ownership handled too | Small PR before Step 4 |
+| One identity for the app and the migration job | The app gets DDL rights it doesn't need | Decide in Step 4 (second identity or a DML-only role) |
+| Bicep declares the image tag | Re-provisioning with an old `STRIA_IMAGE_TAG` would roll the apps back | Step 5: CI always passes the current tag |
+| Not verified offline | That azd reads `main.bicepparam`, and that the budget accepts a date-only `startDate` | `azd provision --preview` in Step 4 |
+| Sample service scales to zero | Nothing polls while it's at zero; the demo needs a way to wake it | Step 6 |
+| The §5 decisions | Subscription, region, budget amount, access model, Postgres stop schedule, teardown date | Authorization gate |
 
 ### Step 4 — Provision (requires authorization)
 
@@ -214,7 +242,7 @@ the one key, Blob Data Contributor on the one container.
 
 - [x] Cloud-specific behaviour is opt-in, tested, and Compose still passes the smoke script.
 - [x] CI produces scanned, SHA-tagged images and a migration bundle.
-- [ ] Bicep and `azure.yaml` describe the full resource set with no secrets.
+- [x] Bicep and `azure.yaml` describe the full resource set with no secrets.
 - [ ] Deployment by CI uses OIDC and a protected environment.
 - [ ] The hosted demo passes the hosted smoke test and a signed-in walkthrough for each role.
 - [ ] Rollback and teardown are documented and rehearsed.
