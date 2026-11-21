@@ -68,6 +68,175 @@ curl -i http://localhost:8080/healthz
 curl -i http://localhost:8080/readyz
 ```
 
+## Deploy to Azure (hosted demo)
+
+> **Not provisioned yet.** This is the runbook for Phase 3 Steps 4–6, which start only after written authorization ([docs/PHASE_3_PLAN.md §5](docs/PHASE_3_PLAN.md)). Until Step 5 adds the CI deploy job, releases are manual, as described below.
+
+The hosted demo is one resource group, `rg-stria-demo`, described entirely by `infra/`. It contains:
+- PostgreSQL Flexible Server (B1ms, Entra sign-in only).
+- A Container Apps environment with `stria-server` (public HTTPS), `sample-payment-gateway` (internal only) and the `stria-migrate` job.
+- Azure Container Registry, Key Vault, a storage account for the Data Protection keys, Log Analytics with Application Insights, one user-assigned managed identity, and a monthly budget.
+
+No password or key is stored in the repository or in the Bicep parameters.
+
+### Prerequisites
+
+- An Azure subscription where you are **Owner**. The deployment creates role assignments, which Contributor can't do.
+- Azure CLI with Bicep (`az bicep version`), the Azure Developer CLI (`azd`), `psql` 16 or later, and `jq`.
+- The Entra app registration from [docs/ENTRA_SETUP.md](docs/ENTRA_SETUP.md), with its tenant ID, client ID and client secret.
+- A clean checkout of the commit you want to deploy. Image tags are `sha-<commit>`.
+
+### One-time setup
+
+**1. Create the azd environment and the resource group.** `STRIA_BUDGET_START_DATE` is the first day of the current month. It is set once and never changed, because Azure rejects any change to a budget's start date.
+
+```sh
+az login && azd auth login
+azd env new demo
+azd env set AZURE_LOCATION centralus
+azd env set AZURE_RESOURCE_GROUP rg-stria-demo
+az group create --name rg-stria-demo --location centralus --tags project=stria
+
+azd env set STRIA_OPERATOR_PRINCIPAL_ID "$(az ad signed-in-user show --query id -o tsv)"
+azd env set STRIA_TENANT_ID <entra-tenant-id>
+azd env set STRIA_CLIENT_ID <entra-client-id>
+azd env set STRIA_BUDGET_AMOUNT 25
+azd env set STRIA_BUDGET_START_DATE "$(date +%Y-%m-01)"
+azd env set STRIA_BUDGET_EMAIL you@example.com    # optional; resource group Owners are always notified
+```
+
+**2. First provision, without the apps.** The apps need images in the registry and secrets in Key Vault, and neither exists yet. `STRIA_DEPLOY_APPS` defaults to `false`, so this run creates everything except the two apps and the job.
+
+```sh
+azd provision --preview    # review what will be created
+azd provision
+eval "$(azd env get-values)"   # loads AZURE_KEY_VAULT_NAME, POSTGRES_HOST, ... into this shell
+```
+
+**3. Give the managed identity a database role.** The server accepts only Entra tokens, so first make yourself its Entra admin. Then add a temporary firewall rule for your IP; the permanent rule admits only Azure services.
+
+```sh
+ME="$(az ad signed-in-user show --query userPrincipalName -o tsv)"
+az postgres flexible-server microsoft-entra-admin create -g "$AZURE_RESOURCE_GROUP" -s "$POSTGRES_SERVER_NAME" \
+  --display-name "$ME" --object-id "$STRIA_OPERATOR_PRINCIPAL_ID" --type User
+MYIP=$(curl -s https://api.ipify.org)
+az postgres flexible-server firewall-rule create -g "$AZURE_RESOURCE_GROUP" -n "$POSTGRES_SERVER_NAME" \
+  --rule-name operator-setup --start-ip-address "$MYIP" --end-ip-address "$MYIP"
+
+export PGPASSWORD="$(az account get-access-token --resource-type oss-rdbms --query accessToken -o tsv)"
+psql "host=$POSTGRES_HOST dbname=postgres sslmode=verify-full sslrootcert=system user=$ME" \
+  -c "SELECT * FROM pgaadauth_create_principal('id-stria-demo', false, false);"
+psql "host=$POSTGRES_HOST dbname=stria sslmode=verify-full sslrootcert=system user=$ME" \
+  -c 'GRANT USAGE, CREATE ON SCHEMA public TO "id-stria-demo";'
+
+az postgres flexible-server firewall-rule delete -g "$AZURE_RESOURCE_GROUP" -n "$POSTGRES_SERVER_NAME" --rule-name operator-setup --yes
+unset PGPASSWORD
+```
+
+The role name must match the identity's name, `id-stria-<environment>`. The app and the migration job currently share this identity, so it owns the tables it creates. Splitting DDL from DML rights is an open Step 4 decision.
+
+**4. Store the secrets in Key Vault.** `read -s` keeps the values out of your shell history. Generate the data-plane key as in [Run with Docker Compose](#run-with-docker-compose).
+
+```sh
+read -rs ENTRA_SECRET && echo
+KEY=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')
+az keyvault secret set --vault-name "$AZURE_KEY_VAULT_NAME" --name entra-client-secret --value "$ENTRA_SECRET" -o none
+az keyvault secret set --vault-name "$AZURE_KEY_VAULT_NAME" --name paymentgateway-key --value "$KEY" -o none
+az keyvault secret set --vault-name "$AZURE_KEY_VAULT_NAME" --name paymentgateway-key-sha256 \
+  --value "$(printf %s "$KEY" | shasum -a 256 | cut -d' ' -f1)" -o none
+unset ENTRA_SECRET KEY
+```
+
+**5. Build the images in the registry.** ACR builds them for `linux/amd64` from your checkout. Until Step 5 these are not the CI-scanned artifacts, so build only from a commit whose CI run passed.
+
+```sh
+TAG="sha-$(git rev-parse HEAD)"; REG="${AZURE_CONTAINER_REGISTRY_ENDPOINT%%.*}"
+az acr build -r "$REG" -t "stria-api:$TAG" -f Stria.API/Dockerfile --target final --platform linux/amd64 .
+az acr build -r "$REG" -t "stria-migrator:$TAG" -f Stria.API/Dockerfile --target migrator --platform linux/amd64 .
+az acr build -r "$REG" -t "stria-sample:$TAG" -f Stria.SampleService/Dockerfile --platform linux/amd64 .
+```
+
+**6. Second provision, with the apps, then migrate.**
+
+```sh
+azd env set STRIA_IMAGE_TAG "$TAG"
+azd env set STRIA_DEPLOY_APPS true
+azd provision
+eval "$(azd env get-values)"
+az containerapp job start -n "$STRIA_MIGRATE_JOB_NAME" -g "$AZURE_RESOURCE_GROUP"
+az containerapp job execution list -n "$STRIA_MIGRATE_JOB_NAME" -g "$AZURE_RESOURCE_GROUP" \
+  --query "sort_by([], &properties.startTime)[-1].properties.status" -o tsv    # repeat until Succeeded
+```
+
+**7. Register the hosted redirect URIs** on the Entra app registration (Authentication → Web): `$STRIA_SERVER_URL/signin-oidc` and `$STRIA_SERVER_URL/signout-callback-oidc`.
+
+### Verify
+
+```sh
+curl -s "$STRIA_SERVER_URL/healthz"    # the first call after idle takes several seconds: cold start from zero
+curl -s -o /dev/null -w '%{http_code}\n' "$STRIA_SERVER_URL/readyz"                # 200
+curl -s -o /dev/null -w '%{http_code}\n' "$STRIA_SERVER_URL/api/v1/chaos/faults"   # 401 when anonymous
+nc -z -G 5 "$POSTGRES_HOST" 5432 || echo "database refuses this IP (expected)"
+```
+
+Then open `$STRIA_SERVER_URL`, sign in, and confirm the role you hold matches what the dashboard allows. The sample service has no public address, so nothing outside the environment can reach it.
+
+### Release a new version (manual until Step 5)
+
+Migrations run before the apps change, never on app startup:
+
+```sh
+TAG="sha-$(git rev-parse HEAD)"    # then build the three images as in step 5
+az containerapp job update -n "$STRIA_MIGRATE_JOB_NAME" -g "$AZURE_RESOURCE_GROUP" \
+  --image "$AZURE_CONTAINER_REGISTRY_ENDPOINT/stria-migrator:$TAG"
+az containerapp job start -n "$STRIA_MIGRATE_JOB_NAME" -g "$AZURE_RESOURCE_GROUP"    # wait for Succeeded
+azd env set STRIA_IMAGE_TAG "$TAG" && azd provision
+```
+
+Always change the version through `STRIA_IMAGE_TAG`. Bicep declares the image, so `azd provision` with an older tag deploys that older image.
+
+### Roll back
+
+```sh
+azd env set STRIA_IMAGE_TAG <previous sha- tag> && azd provision
+```
+
+Migrations are forward-only. A rollback runs the previous code against the current schema, so every migration has to stay compatible with the release before it. If one isn't, roll forward with a fix instead.
+
+### Save money between demos
+
+```sh
+az postgres flexible-server stop  -g "$AZURE_RESOURCE_GROUP" -n "$POSTGRES_SERVER_NAME"
+az postgres flexible-server start -g "$AZURE_RESOURCE_GROUP" -n "$POSTGRES_SERVER_NAME"
+```
+
+A stopped server bills only for storage, and `/readyz` fails, so the app takes no traffic. Azure starts a stopped server again automatically after 7 days, so stop it again if the demo is still idle. Both apps scale to zero on their own.
+
+### Tear down
+
+```sh
+az group delete --name rg-stria-demo --yes
+az keyvault purge --name "$AZURE_KEY_VAULT_NAME"    # soft delete keeps the name reserved for 7 days
+```
+
+Purge the vault before re-creating the group. Otherwise the next provision gets the same vault name and collides with the soft-deleted vault. Also remove the two hosted redirect URIs from the app registration, and delete `.azure/demo/` locally.
+
+### Estimated monthly cost
+
+These are list prices in USD (East US, November 2026); `centralus` is similar. Confirm with the [Azure pricing calculator](https://azure.microsoft.com/pricing/calculator/) before provisioning.
+
+| Resource | Basis | ≈ per month |
+|---|---|---|
+| PostgreSQL B1ms compute | $0.017/hour × 730 | $12.41, $0 while stopped |
+| PostgreSQL storage, 32 GiB | $0.115/GiB | $3.68, also billed while stopped |
+| Container Registry Basic | about $0.167/day | $5 |
+| Container Apps (consumption) | monthly free grant per subscription: 180,000 vCPU-s, 360,000 GiB-s, 2 million requests. Both apps scale to zero | about $0 for demo traffic |
+| Log Analytics + Application Insights | first 5 GB/month free; ingestion capped at 1 GB/day | about $0. The cap bounds the worst case |
+| Key Vault, storage, identity, budget | per operation or per GB | under $0.50 |
+| **Total** | | **about $21 always on; about $9–10 with PostgreSQL stopped between demos** |
+
+The budget alerts at 50% and 90% of `STRIA_BUDGET_AMOUNT`, and when spend is forecast to pass 100%. It only notifies; it never stops anything. A $20 budget is below the always-on estimate, so either set it to about $25 or stop PostgreSQL between demos.
+
 ## CI and quality gates
 
 GitHub Actions runs on pushes and pull requests to `main`:
