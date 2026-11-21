@@ -30,7 +30,7 @@
         </PackageReference>
         <PackageReference Include="Microsoft.Identity.Web" Version="4.18.0" />
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
-        <PackageReference Include="Npgsql.OpenTelemetry" Version="10.0.3" />
+        <PackageReference Include="Npgsql.OpenTelemetry" Version="11.0.0" />
         <ProjectReference Include="..\Stria.Client\Stria.Client.csproj" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.15" />
     </ItemGroup>
