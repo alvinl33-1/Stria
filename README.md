@@ -50,6 +50,16 @@ Compose starts PostgreSQL, waits for its health check, starts Stria, and starts 
 
 Stop the stack with `Ctrl+C`; use `docker compose down` to stop and remove the containers. The named `stria-pgdata` volume retains database contents when containers are removed, and `stria-dpkeys` retains Data Protection keys.
 
+Stria runs as the unprivileged `app` user (UID 1654). If your `stria-dpkeys` volume was created by an older image that ran as root, the new one can't read or write it: pages still load, but keys don't persist, and the logs show `UnauthorizedAccessException`. Recreate that one volume (you'll sign in again):
+
+```sh
+docker compose down
+docker volume rm stria_stria-dpkeys    # the name is <project>_stria-dpkeys; see `docker volume ls`
+docker compose up --build -d
+```
+
+Don't use `docker compose down -v` for this: it deletes every volume, including the database.
+
 Compose migrates on startup for convenience. Releases run the migrations bundle instead, as a separate job before the new revision starts; the same image works against the Compose database:
 
 ```sh
@@ -271,7 +281,7 @@ jq '[.runs[].results[]] | length' /tmp/bicep-lint.sarif   # 0 findings
 
 `main` branch protection requires `build-and-test`, `dependency-audit`, `dependency-review`, `container-build`, and `infra-validate`, and branches must be up to date with `main` before merging. `dependency-review` needs a public repository (or GitHub Advanced Security); drop it from the required checks if the repository becomes private. Administrators can bypass these rules; do not use that bypass for normal changes.
 
-The Phase 2 security plan is in [docs/PHASE_2_PLAN.md](docs/PHASE_2_PLAN.md); its evidence is in [docs/PHASE_2_HANDOFF.md](docs/PHASE_2_HANDOFF.md). Phase 3 (hosted demo on Azure Container Apps) is planned in [docs/PHASE_3_PLAN.md](docs/PHASE_3_PLAN.md), with one figure per sprint in [docs/PHASE_3_SPRINTS.md](docs/PHASE_3_SPRINTS.md); the infrastructure is described, not yet provisioned, in `infra/`.
+The Phase 2 security plan is in [docs/PHASE_2_PLAN.md](docs/PHASE_2_PLAN.md); its evidence is in [docs/PHASE_2_HANDOFF.md](docs/PHASE_2_HANDOFF.md). Phase 3 (hosted demo on Azure Container Apps) is planned in [docs/PHASE_3_PLAN.md](docs/PHASE_3_PLAN.md), with one figure per sprint in [docs/PHASE_3_SPRINTS.md](docs/PHASE_3_SPRINTS.md); the infrastructure is described, not yet provisioned, in `infra/`, and [Deploy to Azure](#deploy-to-azure-hosted-demo) is the runbook.
 
 ## Authentication
 
