@@ -9,6 +9,7 @@ RUN dotnet publish "Stria.Client/Stria.Client.csproj" -c $BUILD_CONFIGURATION -o
 
 # Serve the published static WebAssembly files with SPA route fallback.
 FROM nginx:alpine AS final
+# Pick up Alpine security fixes published after the nginx image was built (Trivy fails on fixable HIGH/CRITICAL).
+RUN apk upgrade --no-cache
 COPY --from=publish /app/publish/wwwroot /usr/share/nginx/html
-COPY ["Stria.Client/nginx.conf", "/etc/nginx/conf.d/default.conf"]
 EXPOSE 80
