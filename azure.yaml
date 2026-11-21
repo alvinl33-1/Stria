@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+# azd provisions infra/ only. CI builds, scans and deploys the sha- tagged images (Sprints 2 and 5),
+# so there is no services: section and `azd deploy` has nothing to do.
+name: stria
+infra:
+  provider: bicep
+  path: infra
+  module: main

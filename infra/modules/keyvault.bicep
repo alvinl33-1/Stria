@@ -64,7 +64,10 @@ resource appKeyWrapper 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(dataProtectionKey.id, appPrincipalId, cryptoServiceEncryptionUserRoleId)
   scope: dataProtectionKey
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cryptoServiceEncryptionUserRoleId)
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      cryptoServiceEncryptionUserRoleId
+    )
     principalId: appPrincipalId
     principalType: 'ServicePrincipal'
   }
