@@ -12,7 +12,7 @@ COPY ["Stria.Client/Stria.Client.csproj", "Stria.Client/"]
 RUN dotnet restore "Stria.API/Stria.API.csproj"
 COPY . .
 FROM build AS publish
-ARG BUILDCONFIGURATION=Release
+ARG BUILD_CONFIGURATION=Release
 COPY . .
 RUN dotnet publish "Stria.API/Stria.API.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false --no-restore
 

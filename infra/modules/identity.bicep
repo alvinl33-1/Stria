@@ -14,3 +14,6 @@ output id string = identity.id
 output principalId string = identity.properties.principalId
 @description('Set as AZURE_CLIENT_ID so DefaultAzureCredential picks this identity.')
 output clientId string = identity.properties.clientId
+
+@description('Also the PostgreSQL role name (Sprint 4 creates it with pgaadauth_create_principal).')
+output name string = identity.name

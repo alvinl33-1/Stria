@@ -47,7 +47,7 @@ Deploy Stria as a reproducible, authenticated portfolio demo (Milestone 7 of
 |---|---|
 | `stria-server` | Container app, **external** ingress (HTTPS), `minReplicas 0–1`, `maxReplicas 1` |
 | `sample-payment-gateway` | Container app, **internal** ingress only, `maxReplicas 1` |
-| `db` (postgres + volume) | Azure Database for PostgreSQL Flexible Server, Burstable B1ms, Entra auth, backups on |
+| `db` (postgres + volume) | Azure Database for PostgreSQL Flexible Server, Burstable B1ms, Entra-only auth (password auth disabled), backups on. Public endpoint limited to Azure services by firewall; see the networking note below |
 | Migrations (startup) | Container Apps **job**, manual trigger, runs an EF bundle before each release |
 | `.env` secrets | Key Vault (RBAC mode); container app secrets with `keyVaultUrl` |
 | Data Protection volume | Blob container + Key Vault key |
@@ -57,6 +57,16 @@ Deploy Stria as a reproducible, authenticated portfolio demo (Milestone 7 of
 Shared: one **user-assigned managed identity** (AcrPull, Key Vault Secrets User, Storage Blob Data
 Contributor on the keys container, Key Vault Crypto Service Encryption User on the DP key,
 PostgreSQL Entra principal). Resource group `rg-stria-demo`.
+
+**PostgreSQL networking (accepted deviation, 2026-11-20).** §1 says PostgreSQL is private. The
+demo uses the server's public endpoint instead, with the firewall rule that admits only Azure
+services and password authentication disabled, so only Entra principals granted a role can sign in.
+VNet integration would need a delegated subnet, a private DNS zone and a Container Apps environment
+on a custom VNet, and the Sprint 4 one-time setup could no longer run from a laptop. The weakness
+is that "Azure services" covers every Azure customer's IP ranges, so authentication is the real
+barrier. That is acceptable for a demo with no real data. A deployment holding customer data
+should use private access. Sprint 6.1 checks that the database refuses connections from outside
+Azure.
 
 ## 4. Work breakdown
 
