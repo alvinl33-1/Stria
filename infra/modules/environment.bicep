@@ -10,11 +10,14 @@ resource workspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existin
   name: workspaceName
 }
 
-resource environment 'Microsoft.App/managedEnvironments@2024-03-01' = {
+// environmentMode must be explicit: without it Azure now creates an Express environment, which
+// rejects jobs and Key Vault secret references (both used here). 2026-07-01 is the first GA API with it.
+resource environment 'Microsoft.App/managedEnvironments@2026-07-01' = {
   name: name
   location: location
   tags: tags
   properties: {
+    environmentMode: 'WorkloadProfiles'
     appLogsConfiguration: {
       destination: 'log-analytics'
       logAnalyticsConfiguration: {
