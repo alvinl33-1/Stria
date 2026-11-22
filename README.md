@@ -80,7 +80,9 @@ curl -i http://localhost:8080/readyz
 
 ## Deploy to Azure (hosted demo)
 
-> **Not provisioned yet.** This is the runbook for Phase 3 Steps 4–6, which start only after written authorization ([docs/PHASE_3_PLAN.md §5](docs/PHASE_3_PLAN.md)). Until Step 5 adds the CI deploy job, releases are manual, as described below.
+> **First provisioned on 2026-11-22** by following this runbook on an Azure for Students subscription; the notes below record what that run needed. Until Step 5 adds the CI deploy job, releases are manual, as described below.
+>
+> The blocks are written for bash. In zsh (the macOS default), run `setopt interactivecomments` first: without it, interactive zsh doesn't treat `#` as a comment, so the inline `# …` notes are passed to the commands as arguments.
 
 The hosted demo is one resource group, `rg-stria-demo`, described entirely by `infra/`. It contains:
 - PostgreSQL Flexible Server (B1ms, Entra sign-in only).
@@ -123,6 +125,8 @@ azd provision
 eval "$(azd env get-values)"   # loads AZURE_KEY_VAULT_NAME, POSTGRES_HOST, ... into this shell
 ```
 
+`azd` warns "Role assignment permissions at the target scopes were not verified" on every provision. Its pre-check only looks at the subscription, while the role assignments sit on individual resources. If you are Owner of the subscription (`az role assignment list --assignee <your object id> --scope /subscriptions/<id>`), the permission is inherited and you can answer **Yes**. The preview also lists `Modify` for existing resources whose service-filled defaults (for example PostgreSQL `storage.tier`) aren't in the template; those are what-if noise. Stop only on a `Delete`.
+
 **3. Give the managed identity a database role.** The server accepts only Entra tokens, so first make yourself its Entra admin. Then add a temporary firewall rule for your IP; the permanent rule admits only Azure services.
 
 ```sh
@@ -130,8 +134,8 @@ ME="$(az ad signed-in-user show --query userPrincipalName -o tsv)"
 az postgres flexible-server microsoft-entra-admin create -g "$AZURE_RESOURCE_GROUP" -s "$POSTGRES_SERVER_NAME" \
   --display-name "$ME" --object-id "$STRIA_OPERATOR_PRINCIPAL_ID" --type User
 MYIP=$(curl -s https://api.ipify.org)
-az postgres flexible-server firewall-rule create -g "$AZURE_RESOURCE_GROUP" -n "$POSTGRES_SERVER_NAME" \
-  --rule-name operator-setup --start-ip-address "$MYIP" --end-ip-address "$MYIP"
+az postgres flexible-server firewall-rule create -g "$AZURE_RESOURCE_GROUP" -s "$POSTGRES_SERVER_NAME" \
+  -n operator-setup --start-ip-address "$MYIP" --end-ip-address "$MYIP"
 
 export PGPASSWORD="$(az account get-access-token --resource-type oss-rdbms --query accessToken -o tsv)"
 psql "host=$POSTGRES_HOST dbname=postgres sslmode=verify-full sslrootcert=system user=$ME" \
@@ -139,13 +143,13 @@ psql "host=$POSTGRES_HOST dbname=postgres sslmode=verify-full sslrootcert=system
 psql "host=$POSTGRES_HOST dbname=stria sslmode=verify-full sslrootcert=system user=$ME" \
   -c 'GRANT USAGE, CREATE ON SCHEMA public TO "id-stria-demo";'
 
-az postgres flexible-server firewall-rule delete -g "$AZURE_RESOURCE_GROUP" -n "$POSTGRES_SERVER_NAME" --rule-name operator-setup --yes
+az postgres flexible-server firewall-rule delete -g "$AZURE_RESOURCE_GROUP" -s "$POSTGRES_SERVER_NAME" -n operator-setup --yes
 unset PGPASSWORD
 ```
 
-The role name must match the identity's name, `id-stria-<environment>`. The app and the migration job currently share this identity, so it owns the tables it creates. Splitting DDL from DML rights is an open Step 4 decision.
+The `firewall-rule` commands take the server with `-s` and the rule name with `-n`. If you sign in with a personal Microsoft account, `$ME` is your `…#EXT#@<tenant>.onmicrosoft.com` name; keep it quoted, and the `psql` user must be exactly that name. The role name must match the identity's name, `id-stria-<environment>`. The app and the migration job currently share this identity, so it owns the tables it creates. Splitting DDL from DML rights is an open Step 4 decision.
 
-**4. Store the secrets in Key Vault.** `read -s` keeps the values out of your shell history. Generate the data-plane key as in [Run with Docker Compose](#run-with-docker-compose).
+**4. Store the secrets in Key Vault.** `read -s` keeps the values out of your shell history. Run the `read` line **on its own**, then paste the secret: if you paste the whole block, `read` can take an empty line and the first `secret set` fails with `--value` missing. Paste the client secret's **Value** (copy icon, shown only once at creation), not its Secret ID or the table row. On macOS, `ENTRA_SECRET="$(pbpaste)"` is a reliable alternative; check `echo ${#ENTRA_SECRET}` (about 40) before storing. Generate the data-plane key as in [Run with Docker Compose](#run-with-docker-compose).
 
 ```sh
 read -rs ENTRA_SECRET && echo
@@ -157,13 +161,23 @@ az keyvault secret set --vault-name "$AZURE_KEY_VAULT_NAME" --name paymentgatewa
 unset ENTRA_SECRET KEY
 ```
 
-**5. Build the images in the registry.** ACR builds them for `linux/amd64` from your checkout. Until Step 5 these are not the CI-scanned artifacts, so build only from a commit whose CI run passed.
+**5. Build the images in the registry.** ACR builds them for `linux/amd64` from your checkout. Until Step 5 these are not the CI-scanned artifacts, so build only from a commit whose CI run passed. **On a free-credit subscription (Azure for Students, free trial), ACR Tasks are paused** and `az acr build` fails with `TasksOperationsNotAllowed`; use the local build after this block instead.
 
 ```sh
 TAG="sha-$(git rev-parse HEAD)"; REG="${AZURE_CONTAINER_REGISTRY_ENDPOINT%%.*}"
 az acr build -r "$REG" -t "stria-api:$TAG" -f Stria.API/Dockerfile --target final --platform linux/amd64 .
 az acr build -r "$REG" -t "stria-migrator:$TAG" -f Stria.API/Dockerfile --target migrator --platform linux/amd64 .
 az acr build -r "$REG" -t "stria-sample:$TAG" -f Stria.SampleService/Dockerfile --platform linux/amd64 .
+```
+
+Local build and push (needs Docker with BuildKit; on Apple Silicon the amd64 build is emulated and slower). `--provenance=false --sbom=false` keeps each image a single manifest, like CI's `docker build`:
+
+```sh
+TAG="sha-$(git rev-parse HEAD)"; LOGIN="$AZURE_CONTAINER_REGISTRY_ENDPOINT"
+az acr login -n "${LOGIN%%.*}"
+docker buildx build --platform linux/amd64 --provenance=false --sbom=false -f Stria.API/Dockerfile --target final -t "$LOGIN/stria-api:$TAG" --push .
+docker buildx build --platform linux/amd64 --provenance=false --sbom=false -f Stria.API/Dockerfile --target migrator -t "$LOGIN/stria-migrator:$TAG" --push .
+docker buildx build --platform linux/amd64 --provenance=false --sbom=false -f Stria.SampleService/Dockerfile -t "$LOGIN/stria-sample:$TAG" --push .
 ```
 
 **6. Second provision, with the apps, then migrate.**
@@ -176,6 +190,12 @@ eval "$(azd env get-values)"
 az containerapp job start -n "$STRIA_MIGRATE_JOB_NAME" -g "$AZURE_RESOURCE_GROUP"
 az containerapp job execution list -n "$STRIA_MIGRATE_JOB_NAME" -g "$AZURE_RESOURCE_GROUP" \
   --query "sort_by([], &properties.startTime)[-1].properties.status" -o tsv    # repeat until Succeeded
+```
+
+`STRIA_IMAGE_TAG` names the commit the images were built from. If `main` moved since step 5 with infra-only changes, keep the old tag rather than recomputing it from `HEAD`, or the apps point at images that don't exist. To read a migration run's output, use the job's container name, `migrate` (the log stream only works while the replica runs). A first run logs a failed `SELECT … "__EFMigrationsHistory"` before creating that table, and a missing `libgssapi_krb5.so.2` (Kerberos, unused); both are expected:
+
+```sh
+az containerapp job logs show -n "$STRIA_MIGRATE_JOB_NAME" -g "$AZURE_RESOURCE_GROUP" --container migrate --tail 40
 ```
 
 **7. Register the hosted redirect URIs** on the Entra app registration (Authentication → Web): `$STRIA_SERVER_URL/signin-oidc` and `$STRIA_SERVER_URL/signout-callback-oidc`.
