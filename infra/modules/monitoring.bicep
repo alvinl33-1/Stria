@@ -5,7 +5,7 @@ param location string
 param tags object
 
 @description('Daily ingestion cap in GB. Past it, logs are dropped until the next day; it bounds the bill.')
-param dailyQuotaGb int = 1
+param dailyQuotaGb string = '0.05'
 
 resource workspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: workspaceName
@@ -17,7 +17,7 @@ resource workspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
     }
     retentionInDays: 30
     workspaceCapping: {
-      dailyQuotaGb: dailyQuotaGb
+      dailyQuotaGb: json(dailyQuotaGb)
     }
   }
 }
