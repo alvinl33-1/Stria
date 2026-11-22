@@ -12,6 +12,20 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    # These families ship one major per .NET release and must move together with the target
+    # framework (lecture 8b). A lone major bump splits a family, so upgrade them deliberately in one
+    # PR when we retarget. Other packages keep their majors; the dependency-audit gate still runs.
+    ignore:
+      - dependency-name: "Microsoft.AspNetCore.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.EntityFrameworkCore*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.Extensions.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Npgsql*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "dotnet-ef"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
