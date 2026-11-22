@@ -241,7 +241,7 @@ These are list prices in USD (East US, November 2026); `centralus` is similar. C
 | PostgreSQL storage, 32 GiB | $0.115/GiB | $3.68, also billed while stopped |
 | Container Registry Basic | about $0.167/day | $5 |
 | Container Apps (consumption) | monthly free grant per subscription: 180,000 vCPU-s, 360,000 GiB-s, 2 million requests. Both apps scale to zero | about $0 for demo traffic |
-| Log Analytics + Application Insights | first 5 GB/month free; ingestion capped at 1 GB/day | about $0. The cap bounds the worst case |
+| Log Analytics + Application Insights | first 5 GB/month free; ingestion capped at 0.05 GB/day (about 1.5 GB/month) | $0. The cap keeps even the worst case inside the free grant |
 | Key Vault, storage, identity, budget | per operation or per GB | under $0.50 |
 | **Total** | | **about $21 always on; about $9–10 with PostgreSQL stopped between demos** |
 
