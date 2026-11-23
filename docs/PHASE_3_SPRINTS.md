@@ -1,9 +1,10 @@
 # Phase 3 Sprints, in Figures
 
-One figure per sprint of [PHASE_3_PLAN.md](PHASE_3_PLAN.md). **Status (2026-11-22):** Sprints 0–4 are
+One figure per sprint of [PHASE_3_PLAN.md](PHASE_3_PLAN.md). **Status (2026-11-23):** Sprints 0–4 are
 done. Sprints 0–3 are #23–#30 (see the plan's Step 3 progress table). Sprint 4 provisioned the hosted
 demo after the written authorization on 2026-11-21 (see the plan's Step 4 progress table, and #38–#40
-for the fixes it needed). Sprints 5 and 6 remain.
+for the fixes it needed). Sprint 5 is in progress (see the plan's Step 5 progress table); Sprint 6
+remains.
 
 The figures are built by `node docs/figures/src/phase-3-sprints.mjs`. Edit the script, not the SVGs.
 
