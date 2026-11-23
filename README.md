@@ -209,7 +209,7 @@ curl -s -o /dev/null -w '%{http_code}\n' "$STRIA_SERVER_URL/api/v1/chaos/faults"
 nc -z -G 5 "$POSTGRES_HOST" 5432 || echo "database refuses this IP (expected)"
 ```
 
-Then open `$STRIA_SERVER_URL`, sign in, and confirm the role you hold matches what the dashboard allows. The sample service has no public address, so nothing outside the environment can reach it.
+`scripts/hosted-smoke.sh "$STRIA_SERVER_URL"` runs the automated checks (health, anonymous rejection, the https sign-in redirect, the CSP, and that the sample service isn't public); the deploy job runs it after every release. Then open `$STRIA_SERVER_URL`, sign in, and confirm the role you hold matches what the dashboard allows. The sample service has no public address, so nothing outside the environment can reach it.
 
 ### Release a new version (manual until Step 5)
 
