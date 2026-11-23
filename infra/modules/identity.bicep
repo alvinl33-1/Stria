@@ -1,5 +1,6 @@
-// One user-assigned identity for the apps and the migration job. It exists before any revision
-// starts, so its role assignments are already in place on the first pull and the first token.
+// A user-assigned identity. main.bicep creates two: one for the apps and the migration job, and
+// one the GitHub deploy job signs in as (Sprint 5). Each exists before anything uses it, so its role
+// assignments are already in place on the first pull and the first token.
 param name string
 param location string
 param tags object
