@@ -19,6 +19,9 @@ param entraTenantId string = ''
 @description('Client ID of the Stria app registration. Not secret.')
 param entraClientId string = ''
 
+@description('OIDC subject of the GitHub deploy job (Sprint 5): immutable form, owner and repository IDs, then the environment. Not secret.')
+param githubDeploySubject string = 'repo:alvinl33-1@174841578/Stria@1457068099:environment:demo'
+
 @description('Image tag for all three images: sha-<commit> from CI (Sprint 2). Never latest.')
 param imageTag string = ''
 
@@ -177,6 +180,30 @@ module budget 'modules/budget.bicep' = if (!empty(budgetStartDate)) {
   }
 }
 
+// Sprint 5: the identity GitHub Actions deploys as, and its narrow rights on the apps above.
+module deployIdentity 'modules/identity.bicep' = if (deployApps) {
+  name: 'deploy-identity'
+  params: {
+    name: 'id-stria-deploy-${environmentName}'
+    location: location
+    tags: tags
+  }
+}
+module deployAccess 'modules/deploy-access.bicep' = if (deployApps) {
+  name: 'deploy-access'
+  params: {
+    identityName: deployIdentity!.outputs.name
+    principalId: deployIdentity!.outputs.principalId
+    githubSubject: githubDeploySubject
+    registryName: registry.outputs.name
+    serverAppName: server!.outputs.name
+    sampleAppName: sample!.outputs.name
+    migrateJobName: migrate!.outputs.name
+    appIdentityName: identity.outputs.name
+    postgresServerName: postgres.outputs.name
+  }
+}
+
 // Upper-case outputs become azd environment values (Sprint 4 setup and Sprint 5 deploy read them).
 output AZURE_CONTAINER_REGISTRY_ENDPOINT string = registry.outputs.loginServer
 output AZURE_KEY_VAULT_NAME string = keyVault.outputs.name
@@ -185,6 +212,7 @@ output POSTGRES_SERVER_NAME string = postgres.outputs.name
 output POSTGRES_HOST string = postgres.outputs.fqdn
 output STRIA_SERVER_URL string = deployApps ? 'https://${server!.outputs.fqdn}' : ''
 output STRIA_MIGRATE_JOB_NAME string = deployApps ? migrate!.outputs.name : ''
+output STRIA_DEPLOY_CLIENT_ID string = deployApps ? deployIdentity!.outputs.clientId : ''
 // Consumed by the container app modules in ticket 3.2. They map one-to-one onto the Sprint 1
 // settings (PHASE_3_PLAN.md, Step 1 table).
 output identityId string = identity.outputs.id

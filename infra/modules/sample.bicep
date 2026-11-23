@@ -81,3 +81,5 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
     }
   }
 }
+
+output name string = app.name
