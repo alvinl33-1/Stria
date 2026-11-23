@@ -80,7 +80,7 @@ curl -i http://localhost:8080/readyz
 
 ## Deploy to Azure (hosted demo)
 
-> **First provisioned on 2026-11-22** by following this runbook on an Azure for Students subscription; the notes below record what that run needed. Until Step 5 adds the CI deploy job, releases are manual, as described below.
+> **First provisioned on 2026-11-22** by following this runbook on an Azure for Students subscription; the notes below record what that run needed. Since Sprint 5, every push to `main` deploys through CI after an approval (see [Release a new version](#release-a-new-version)); provisioning stays manual.
 >
 > The blocks are written for bash. In zsh (the macOS default), run `setopt interactivecomments` first: without it, interactive zsh doesn't treat `#` as a comment, so the inline `# …` notes are passed to the commands as arguments.
 
@@ -211,25 +211,38 @@ nc -z -G 5 "$POSTGRES_HOST" 5432 || echo "database refuses this IP (expected)"
 
 `scripts/hosted-smoke.sh "$STRIA_SERVER_URL"` runs the automated checks (health, anonymous rejection, the https sign-in redirect, the CSP, and that the sample service isn't public); the deploy job runs it after every release. Then open `$STRIA_SERVER_URL`, sign in, and confirm the role you hold matches what the dashboard allows. The sample service has no public address, so nothing outside the environment can reach it.
 
-### Release a new version (manual until Step 5)
+### Release a new version
 
-Migrations run before the apps change, never on app startup:
+Every push to `main` deploys, once the `deploy` job is approved:
+
+1. `container-build` builds and scans the three images, then uploads exactly those bytes as a one-day artifact. Nothing is rebuilt for the deploy.
+2. The `deploy` job waits in the `demo` environment. Approve it under the workflow run's **Review deployments**. **Start PostgreSQL first** if it is stopped: the job checks and stops before changing anything.
+3. It signs in to Azure with OIDC (no stored secret) and runs `scripts/deploy-demo.sh --push sha-<commit>`. The script pushes the images, records the tag running now, runs the `stria-migrate` job and waits for `Succeeded`, then moves both apps to the new tag and waits for each new revision to be the ready one. Last, it runs `scripts/hosted-smoke.sh`.
+4. If anything fails after the first change, the script moves what it changed back to the recorded tag and smoke-tests the result.
+
+| Exit code | Meaning |
+|---|---|
+| 0 | Deployed and the smoke test passed |
+| 1 | Failed; nothing changed, or the rollback passed the smoke test |
+| 2 | Usage: bad tag or a missing setting, nothing called |
+| 3 | The rollback did not pass the smoke test: the demo needs a person now |
+
+The script also runs by hand, with the azd environment's values, for a tag that is already in the registry:
 
 ```sh
-TAG="sha-$(git rev-parse HEAD)"    # then build the three images as in step 5
-az containerapp job update -n "$STRIA_MIGRATE_JOB_NAME" -g "$AZURE_RESOURCE_GROUP" \
-  --image "$AZURE_CONTAINER_REGISTRY_ENDPOINT/stria-migrator:$TAG"
-az containerapp job start -n "$STRIA_MIGRATE_JOB_NAME" -g "$AZURE_RESOURCE_GROUP"    # wait for Succeeded
-azd env set STRIA_IMAGE_TAG "$TAG" && azd provision
+set -a; eval "$(azd env get-values)"; set +a
+scripts/deploy-demo.sh sha-<commit>
 ```
 
-Always change the version through `STRIA_IMAGE_TAG`. Bicep declares the image, so `azd provision` with an older tag deploys that older image.
+**Until ticket 5.3 lands, `azd provision` sets the images from `STRIA_IMAGE_TAG`**, so after a CI deploy it would put the apps back on the older tag. Before provisioning, set it to the tag that is running:
+
+```sh
+azd env set STRIA_IMAGE_TAG "$(az containerapp show -g rg-stria-demo -n stria-server --query 'properties.template.containers[0].image' -o tsv | sed 's/.*://')"
+```
 
 ### Roll back
 
-```sh
-azd env set STRIA_IMAGE_TAG <previous sha- tag> && azd provision
-```
+A failed release rolls itself back. To return to an earlier release on purpose, run the **Deploy** workflow (`.github/workflows/deploy.yml`) from `main` with `image_tag` set to that `sha-` tag. It needs the same approval, never builds, and runs the same script without `--push`, so the tag must already be in the registry. `scripts/deploy-demo.sh <tag>` does the same from a terminal.
 
 Migrations are forward-only. A rollback runs the previous code against the current schema, so every migration has to stay compatible with the release before it. If one isn't, roll forward with a fix instead.
 
@@ -278,6 +291,7 @@ GitHub Actions runs on pushes and pull requests to `main`:
 | `dependency-review` | A pull request does not introduce high-severity vulnerable dependencies (public repositories; private repositories need GitHub Advanced Security) |
 | `container-build` | Builds the control-plane, migration-job and sample-service images for `linux/amd64`, tagged `sha-<commit>` (never `latest`). The control-plane image starts in Production mode and serves the Blazor script its pages reference; the migrations bundle brings an empty PostgreSQL to the latest migration and is a no-op on a second run; Trivy fails the job on fixable HIGH/CRITICAL findings in any image (accepted findings go in `.trivyignore`) |
 | `infra-validate` | `infra/` compiles with the pinned Bicep version (template, and the parameters file with and without the apps and budget), has no lint findings (warnings count), and is formatted (`az bicep format`). Needs no Azure login |
+| `deploy` | Pushes to `main` only, after approval in the `demo` environment: deploys the scanned images to the hosted demo, smoke-tests them, and rolls back on failure (see [Release a new version](#release-a-new-version)). Not a required check: pull requests skip it |
 
 Integration tests use Testcontainers and PostgreSQL. CI sets `STRIA_REQUIRE_DOCKER_TESTS=true`, so the job fails rather than silently skipping PostgreSQL coverage when Docker cannot start. Dependabot checks NuGet packages, GitHub Actions, and Docker base images weekly.
 
@@ -301,7 +315,7 @@ jq '[.runs[].results[]] | length' /tmp/bicep-lint.sarif   # 0 findings
 
 `main` branch protection requires `build-and-test`, `dependency-audit`, `dependency-review`, `container-build`, and `infra-validate`, and branches must be up to date with `main` before merging. `dependency-review` needs a public repository (or GitHub Advanced Security); drop it from the required checks if the repository becomes private. Administrators can bypass these rules; do not use that bypass for normal changes.
 
-The Phase 2 security plan is in [docs/PHASE_2_PLAN.md](docs/PHASE_2_PLAN.md); its evidence is in [docs/PHASE_2_HANDOFF.md](docs/PHASE_2_HANDOFF.md). Phase 3 (hosted demo on Azure Container Apps) is planned in [docs/PHASE_3_PLAN.md](docs/PHASE_3_PLAN.md), with one figure per sprint in [docs/PHASE_3_SPRINTS.md](docs/PHASE_3_SPRINTS.md); the infrastructure is described, not yet provisioned, in `infra/`, and [Deploy to Azure](#deploy-to-azure-hosted-demo) is the runbook.
+The Phase 2 security plan is in [docs/PHASE_2_PLAN.md](docs/PHASE_2_PLAN.md); its evidence is in [docs/PHASE_2_HANDOFF.md](docs/PHASE_2_HANDOFF.md). Phase 3 (hosted demo on Azure Container Apps) is planned in [docs/PHASE_3_PLAN.md](docs/PHASE_3_PLAN.md), with one figure per sprint in [docs/PHASE_3_SPRINTS.md](docs/PHASE_3_SPRINTS.md); the infrastructure is described in `infra/` and was first provisioned in Sprint 4, and [Deploy to Azure](#deploy-to-azure-hosted-demo) is the runbook.
 
 ## Authentication
 

@@ -1,0 +1,51 @@
+name: Deploy
+# Redeploys or rolls back to a tag that is already in the registry (Sprint 5). Pushes to main
+# deploy from ci.yml; this workflow never builds, so bringing back an old tag takes minutes, and
+# deploy-demo.sh still migrates, smoke-tests and rolls back exactly as it does there.
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to deploy'
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  deploy:
+    name: deploy
+    # The OIDC subject names the environment, not the branch, so a run from any branch would get
+    # a token Azure accepts. The `demo` branch policy blocks unprotected branches; this is the
+    # second lock.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    environment:
+      name: demo
+      url: ${{ vars.STRIA_SERVER_URL }}
+    # Same group as ci.yml's deploy job: the two never run at once.
+    concurrency:
+      group: deploy-demo
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      # The input is typed by a person, so it reaches bash through env and the script checks its
+      # format before any Azure call (exit 2 on anything but sha-<40 hex>).
+      - name: Deploy, smoke-test, roll back on failure
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_CONTAINER_REGISTRY_ENDPOINT: ${{ vars.AZURE_CONTAINER_REGISTRY_ENDPOINT }}
+          POSTGRES_SERVER_NAME: ${{ vars.POSTGRES_SERVER_NAME }}
+          STRIA_SERVER_URL: ${{ vars.STRIA_SERVER_URL }}
+        run: scripts/deploy-demo.sh "$IMAGE_TAG"

@@ -237,7 +237,7 @@ test fails, roll back to the previous tag automatically.
 |---|---|---|
 | 5.0 Deploy identity + OIDC trust | Merged #42, provisioned 2026-11-23 | `id-stria-deploy-demo` with federated credential `github-demo`; 6 roles, each on one resource (AcrPush on the registry, Container Apps Contributor on both apps, Jobs Contributor on `stria-migrate`, Managed Identity Operator on `id-stria-demo`, Reader on PostgreSQL). GitHub environment `demo`: reviewer Alvin, protected branches only, 6 variables |
 | 5.1 `scripts/hosted-smoke.sh` | Merged #43 | 11 checks pass live; planted defects fail (exit 2 misuse, exit 1 failure) |
-| 5.2 Deploy job | Next | Design below |
+| 5.2 Deploy job | In progress | `scripts/deploy-demo.sh` (16 scenarios against stubbed `az`/`docker`, bash 5 and 3.2, shellcheck clean), `deploy` job in `ci.yml`, manual `deploy.yml`; proven by the first run after merge |
 | 5.3 Live image tag for `azd provision` | Planned | An azd `preprovision` hook reads the tag running on `stria-server` and sets `STRIA_IMAGE_TAG`, so provisioning never rolls the apps back |
 | 5.4 Separate migrator and app identities | Planned | `id-stria-migrate` owns the tables; `id-stria-demo` keeps DML only (`GRANT SELECT, INSERT, UPDATE, DELETE` plus `ALTER DEFAULT PRIVILEGES`) |
 
@@ -262,8 +262,12 @@ subject GitHub sent, and `githubDeploySubject` in `main.bicep` is the one line t
    `sha-<commit>` tags; record the tag `stria-server` runs now; point the migration job at the new
    image, start it, wait for `Succeeded`; update both apps; run `scripts/hosted-smoke.sh`; on
    exit 1, update both apps back to the recorded tag and fail the job.
-4. Keep the Azure commands in a script that the job calls, so the same steps can run by hand
-   (`workflow_dispatch` with a tag input for a redeploy or a manual rollback).
+4. Keep the Azure commands in `scripts/deploy-demo.sh`, which the job calls, so the same steps
+   can run by hand. Manual redeploys and rollbacks use a separate `deploy.yml` workflow
+   (`workflow_dispatch` only, an `image_tag` input, same `demo` environment and concurrency
+   group) that runs the script without `--push`, because that tag is already in the registry.
+   *Decided 2026-11-23:* a tag input on `ci.yml` would rebuild and scan the current commit before
+   deploying an older one, and its `needs` chain would skip the deploy when the build jobs skip.
 5. Rollback replaces images but not the database: migrations stay forward-only, so a release
    must not drop or rename anything the previous image still uses.
 
