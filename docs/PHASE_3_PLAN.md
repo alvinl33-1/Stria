@@ -237,7 +237,7 @@ test fails, roll back to the previous tag automatically.
 |---|---|---|
 | 5.0 Deploy identity + OIDC trust | Merged #42, provisioned 2026-11-23 | `id-stria-deploy-demo` with federated credential `github-demo`; 6 roles, each on one resource (AcrPush on the registry, Container Apps Contributor on both apps, Jobs Contributor on `stria-migrate`, Managed Identity Operator on `id-stria-demo`, Reader on PostgreSQL). GitHub environment `demo`: reviewer Alvin, protected branches only, 6 variables |
 | 5.1 `scripts/hosted-smoke.sh` | Merged #43 | 11 checks pass live; planted defects fail (exit 2 misuse, exit 1 failure) |
-| 5.2 Deploy job | In progress | `scripts/deploy-demo.sh` (16 scenarios against stubbed `az`/`docker`, bash 5 and 3.2, shellcheck clean), `deploy` job in `ci.yml`, manual `deploy.yml`; proven by the first run after merge |
+| 5.2 Deploy job | Merged #46; fix 5.2a in review | `scripts/deploy-demo.sh` (16 scenarios against stubbed `az`/`docker`, bash 5 and 3.2, shellcheck clean), `deploy` job in `ci.yml`, manual `deploy.yml`; proven by the first run after merge |
 | 5.3 Live image tag for `azd provision` | Planned | An azd `preprovision` hook reads the tag running on `stria-server` and sets `STRIA_IMAGE_TAG`, so provisioning never rolls the apps back |
 | 5.4 Separate migrator and app identities | Planned | `id-stria-migrate` owns the tables; `id-stria-demo` keeps DML only (`GRANT SELECT, INSERT, UPDATE, DELETE` plus `ALTER DEFAULT PRIVILEGES`) |
 
@@ -271,9 +271,15 @@ subject GitHub sent, and `githubDeploySubject` in `main.bicep` is the one line t
 5. Rollback replaces images but not the database: migrations stay forward-only, so a release
    must not drop or rename anything the previous image still uses.
 
-**Still unproven until 5.2 runs:** the subject suffix, whether Managed Identity Operator is enough
-for `az containerapp update` on an app that runs as `id-stria-demo` (otherwise
-`LinkedAuthorizationFailed`), and how long the image artifact upload and download take.
+**First run (2026-11-23, run 45233761299, `a614ec9`):** the OIDC login worked with the
+`:environment:demo` subject, `az acr login` worked with AcrPush only, the migration job ran, and
+`az containerapp update` succeeded with Managed Identity Operator (the new revision came up
+Healthy). The artifact took 3 s to download and 4 s to load. The deploy still failed: the
+revision wait read `az -o tsv` for a JMESPath list as one tab-separated row, but tsv prints a list
+of scalars one value per line, so the image came back empty. The rollback worked (both apps and
+the job back on `sha-ae9be7e6`, smoke test green afterwards), but its wait had the same bug, so it
+reported exit 3. The stubbed `az` used in testing printed one row, the same wrong assumption.
+Fixed in 5.2a by wrapping the query in a second list, which tsv prints as one row.
 
 ### Step 6 — Verify, document, hand off
 

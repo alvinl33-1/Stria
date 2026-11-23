@@ -73,9 +73,10 @@ set_image() {
 wait_for_revision() {
   local app="$1" image="$2" deadline=$((SECONDS + revision_timeout)) out latest ready current state
   while ((SECONDS < deadline)); do
+    # tsv prints a list of values one per line; the outer [ ] makes it a single row for read.
     # `|| 'none'`: a null field prints as an empty tsv column, and read would shift the rest left.
     out="$(az containerapp show -g "$rg" -n "$app" -o tsv --query \
-      "[properties.latestRevisionName, properties.latestReadyRevisionName || 'none', properties.template.containers[0].image]")" || return 1
+      "[[properties.latestRevisionName, properties.latestReadyRevisionName || 'none', properties.template.containers[0].image]]")" || return 1
     read -r latest ready current <<<"$out"
     if [[ "$current" != "$image" ]]; then
       echo "$app runs $current, expected $image." >&2
