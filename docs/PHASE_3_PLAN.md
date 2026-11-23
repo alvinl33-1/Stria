@@ -1,6 +1,6 @@
 # Stria Phase 3 Plan — Hosted Demo on Azure Container Apps
 
-**Status (2026-11-22):** Steps 1–4 are complete. Steps 1–3 (#23–#30) delivered cloud-ready code,
+**Status (2026-11-23):** Steps 1–4 are complete; Step 5 is in progress (5.0 and 5.1 merged). Steps 1–3 (#23–#30) delivered cloud-ready code,
 release artifacts, the `Program.cs` refactor, every Bicep module, `azure.yaml`, the budget, the
 required `infra-validate` CI job and the README "Deploy to Azure" runbook; the API image runs
 unprivileged (ticket 4.0). **Step 4 provisioned the hosted demo** on 2026-11-21/22 after the §5
@@ -225,6 +225,51 @@ entry, zsh comments, azd's role-assignment warning, job logs).
   workflow; no client secrets in GitHub.
 - On `main` after all checks pass: push images to ACR, run the migration job, then update both
   container apps to the new `sha-` tag. Stop on any failure.
+
+**Decisions (Alvin, 2026-11-22):** deploy automatically on every push to `main`, paused for
+Alvin's approval in the `demo` environment; if PostgreSQL is stopped, fail early with a clear
+message instead of starting it; do the identity split (5.4) in this sprint; when the hosted smoke
+test fails, roll back to the previous tag automatically.
+
+**Step 5 progress:**
+
+| Ticket | State | Evidence |
+|---|---|---|
+| 5.0 Deploy identity + OIDC trust | Merged #42, provisioned 2026-11-23 | `id-stria-deploy-demo` with federated credential `github-demo`; 6 roles, each on one resource (AcrPush on the registry, Container Apps Contributor on both apps, Jobs Contributor on `stria-migrate`, Managed Identity Operator on `id-stria-demo`, Reader on PostgreSQL). GitHub environment `demo`: reviewer Alvin, protected branches only, 6 variables |
+| 5.1 `scripts/hosted-smoke.sh` | Merged #43 | 11 checks pass live; planted defects fail (exit 2 misuse, exit 1 failure) |
+| 5.2 Deploy job | Next | Design below |
+| 5.3 Live image tag for `azd provision` | Planned | An azd `preprovision` hook reads the tag running on `stria-server` and sets `STRIA_IMAGE_TAG`, so provisioning never rolls the apps back |
+| 5.4 Separate migrator and app identities | Planned | `id-stria-migrate` owns the tables; `id-stria-demo` keeps DML only (`GRANT SELECT, INSERT, UPDATE, DELETE` plus `ALTER DEFAULT PRIVILEGES`) |
+
+**OIDC subject.** This repository uses GitHub's immutable subjects (`use_immutable_subject:
+true`), so the federated credential trusts
+`repo:alvinl33-1@174841578/Stria@1457068099:environment:demo`, with owner and repository IDs
+instead of names. The `:environment:demo` suffix follows GitHub's documented format and is
+confirmed by the first login in 5.2. If it is wrong, Entra's `AADSTS700213` error prints the
+subject GitHub sent, and `githubDeploySubject` in `main.bicep` is the one line to change.
+
+**5.2 design (to be built and verified in the ticket):**
+
+1. `container-build` saves the three scanned images and uploads them as an artifact, kept for one
+   day, only on pushes to `main`. The deploy pushes those exact bytes and never rebuilds.
+2. A `deploy` job in `ci.yml` with `needs: [build-and-test, container-build, dependency-audit,
+   infra-validate]`, `if: github.event_name == 'push' && github.ref == 'refs/heads/main'`,
+   `environment: demo`, `permissions: id-token: write, contents: read`, a `concurrency` group so
+   deploys never overlap, and a timeout. `dependency-review` must not be in `needs`: it runs only
+   on pull requests, so on a push it is skipped, and a skipped dependency skips the deploy.
+3. Steps: `azure/login` with OIDC (the `demo` variables); stop unless PostgreSQL is `Ready`
+   (needs a `POSTGRES_SERVER_NAME` variable); load the images, `az acr login`, push the
+   `sha-<commit>` tags; record the tag `stria-server` runs now; point the migration job at the new
+   image, start it, wait for `Succeeded`; update both apps; run `scripts/hosted-smoke.sh`; on
+   exit 1, update both apps back to the recorded tag and fail the job.
+4. Keep the Azure commands in a script that the job calls, so the same steps can run by hand
+   (`workflow_dispatch` with a tag input for a redeploy or a manual rollback).
+5. Rollback replaces images but not the database: migrations stay forward-only, so a release
+   must not drop or rename anything the previous image still uses.
+
+**Still unproven until 5.2 runs:** the subject suffix, whether Managed Identity Operator is enough
+for `az containerapp update` on an app that runs as `id-stria-demo` (otherwise
+`LinkedAuthorizationFailed`), and how long the image artifact upload and download take.
 
 ### Step 6 — Verify, document, hand off
 
