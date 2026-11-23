@@ -34,3 +34,6 @@ coverage.*.xml
 # OS files
 .DS_Store
 Thumbs.db
+
+# graphify knowledge-graph output: generated locally per clone
+/graphify-out/
