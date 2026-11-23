@@ -1,10 +1,12 @@
 # Stria Phase 3 Plan — Hosted Demo on Azure Container Apps
 
-**Status (2026-11-20):** Steps 1–3 are complete (#23–#30): cloud-ready code, release artifacts,
-the `Program.cs` refactor, every Bicep module, `azure.yaml`, the budget, the required
-`infra-validate` CI job and the README "Deploy to Azure" runbook. The API image runs unprivileged
-(ticket 4.0). Nothing is provisioned: Step 4 waits for the §5 decisions in writing. Prepared on 2026-11-18 after Phase 2 closed
-([PHASE_2_HANDOFF.md](PHASE_2_HANDOFF.md)); see "Before Step 4" at the end of Step 3.
+**Status (2026-11-22):** Steps 1–4 are complete. Steps 1–3 (#23–#30) delivered cloud-ready code,
+release artifacts, the `Program.cs` refactor, every Bicep module, `azure.yaml`, the budget, the
+required `infra-validate` CI job and the README "Deploy to Azure" runbook; the API image runs
+unprivileged (ticket 4.0). **Step 4 provisioned the hosted demo** on 2026-11-21/22 after the §5
+decisions were made in writing, and Alvin's signed-in walkthrough on it succeeded; see "Step 4
+progress". Steps 5 (CI deploy) and 6 (hosted smoke test, per-role walkthrough, rehearsals) remain.
+Prepared on 2026-11-18 after Phase 2 closed ([PHASE_2_HANDOFF.md](PHASE_2_HANDOFF.md)).
 
 **Authorization gate:** Steps 1–3 below change only code, CI and documentation and need no Azure
 account. **Step 4 onward creates billable Azure resources and must not start until Alvin explicitly
@@ -187,11 +189,11 @@ parameters, fails on any lint finding and checks formatting. It is a required ch
 | Item | Why it matters | When |
 |---|---|---|
 | ~~`stria-api` final image runs as root~~ | Fixed in ticket 4.0: `USER $APP_UID`, key directory owned by `app`; CI asserts non-root and a written key ring | Done |
-| One identity for the app and the migration job | The app gets DDL rights it doesn't need | Decide in Step 4 (second identity or a DML-only role) |
+| One identity for the app and the migration job | The app gets DDL rights it doesn't need | Deferred from Step 4 (the demo runs with one identity): Step 5, second identity or a DML-only role |
 | Bicep declares the image tag | Re-provisioning with an old `STRIA_IMAGE_TAG` would roll the apps back | Step 5: CI always passes the current tag |
-| Not verified offline | That azd reads `main.bicepparam`, and that the budget accepts a date-only `startDate` | `azd provision --preview` in Step 4 |
+| ~~Not verified offline~~ | azd read `main.bicepparam` (resource names came from `AZURE_ENV_NAME`), and the budget accepted `startDate` `2026-11-01` | Done in Step 4 |
 | Sample service scales to zero | Nothing polls while it's at zero; the demo needs a way to wake it | Step 6 |
-| The §5 decisions | Subscription, region, budget amount, access model, Postgres stop schedule, teardown date | Authorization gate |
+| ~~The §5 decisions~~ | Made in writing on 2026-11-21, except the teardown date (see §5) | Done |
 
 ### Step 4 — Provision (requires authorization)
 
@@ -200,6 +202,22 @@ parameters, fails on any lint finding and checks formatting. It is a required ch
   only the grants the app needs; store the client secret and data-plane key in Key Vault.
 - Entra app registration: add the hosted `https://<app>/signin-oidc` and
   `https://<app>/signout-callback-oidc` redirect URIs.
+
+**Step 4 progress** (2026-11-21/22, Azure for Students subscription, `rg-stria-demo` in `centralus`):
+
+| Runbook step | Outcome | Evidence |
+|---|---|---|
+| Pre-checks | `centralus` is in the subscription's allowed-regions policy; 7 resource providers had to be registered; Alvin is Owner | `az policy assignment list`, `az provider show`, `az role assignment list` |
+| 1–2 First provision (no apps) | Succeeded in 7 min 23 s | Budget $10/month from 2026-11-01; workspace cap 0.05 GB/day (#38, set before the first provision); all 5 role assignments on their narrow scopes |
+| 3 Database role | Entra admin = Alvin (a personal Microsoft account, so a `#EXT#` UPN); role `id-stria-demo` created; temporary firewall rule removed | `pgaadauth_create_principal`, `GRANT` |
+| 4 Secrets | 3 secrets in Key Vault; the client secret was checked with a client-credentials token request; the data-plane hash matches its key | `az keyvault secret list` |
+| 5 Images | ACR Tasks are paused on free-credit subscriptions, so the images were built locally with `docker buildx --platform linux/amd64` and pushed | `sha-ae9be7e…`, linux/amd64, UID 1654 |
+| 6 Apps + migration | First attempt failed: Azure created the environment in **Express** mode, which rejects jobs and Key Vault secret references. Fixed in #39 (`environmentMode: 'WorkloadProfiles'`, API 2026-07-01); the empty environment was deleted and re-provisioned. Migration `stria-migrate` succeeded (3 migrations) | Live `environmentMode: WorkloadProfiles` |
+| 7 Redirect URIs | Hosted `/signin-oidc` and `/signout-callback-oidc` added | Entra serves its sign-in page, no `AADSTS50011` |
+| Verify | `/healthz` 200, `/readyz` 200, the faults API 401 when anonymous, `/` redirects to Entra with an `https` redirect URI (forwarded headers work), the database and sample service are unreachable from outside, Alvin's signed-in walkthrough succeeded | `curl`, browser |
+
+The runbook was corrected afterwards in #40 (firewall-rule flags, the local image build, secret
+entry, zsh comments, azd's role-assignment warning, job logs).
 
 ### Step 5 — CI deploy with OIDC (requires authorization)
 
@@ -216,16 +234,18 @@ parameters, fails on any lint finding and checks formatting. It is a required ch
 - Rollback rehearsal: redeploy the previous `sha-` tag and confirm it serves.
 - Teardown rehearsal documented (`azd down` or resource-group delete) and the date agreed.
 
-## 5. Decisions needed from Alvin before Step 4
+## 5. Decisions made before Step 4
 
-| Decision | Default proposal |
-|---|---|
-| Azure subscription and region | A region close to UW–Madison, e.g. `centralus` |
-| Monthly budget cap and alert threshold | Low cap with an alert at 50% and 90% |
-| Demo access model | Reviewers get `ChaosViewer` by default; `ChaosOperator` granted on request; `ChaosAdmin` only for Alvin |
-| PostgreSQL always on vs. scheduled stop | Stop the server when not demoing |
-| Custom domain | None (use the generated `azurecontainerapps.io` host) |
-| Teardown date | Agree one when provisioning |
+Agreed in writing by Alvin on 2026-11-21.
+
+| Decision | Default proposal | Decided |
+|---|---|---|
+| Azure subscription and region | A region close to UW–Madison, e.g. `centralus` | **Azure for Students** on Alvin's personal account ($100 credit for 12 months; a hard spending limit, so the subscription is disabled rather than billed when the credit runs out). **`centralus`**, which the subscription's region policy allows (alternatives: `northcentralus`, `eastus2`, `westus3`, `mexicocentral`) |
+| Monthly budget cap and alert threshold | Low cap with an alert at 50% and 90% | **$10/month**, alerts at 50% and 90% actual and 100% forecast. With PostgreSQL stopped between demos the estimate is about $9–10, so the 90% alert effectively means "PostgreSQL was left on" |
+| Demo access model | Reviewers get `ChaosViewer` by default; `ChaosOperator` granted on request; `ChaosAdmin` only for Alvin | **As proposed.** Reviewers are guest accounts in the Entra tenant; `ChaosOperator` is granted on request for a limited time, then removed |
+| PostgreSQL always on vs. scheduled stop | Stop the server when not demoing | **Stopped between demos.** Azure restarts a stopped server after 7 days, so it has to be stopped again |
+| Custom domain | None (use the generated `azurecontainerapps.io` host) | **None** |
+| Teardown date | Agree one when provisioning | **Not set yet:** the credit's expiry date is still unknown. Tear down early if the remaining credit drops below $15 |
 
 ## 6. Risks
 
@@ -237,6 +257,8 @@ parameters, fails on any lint finding and checks formatting. It is a required ch
 | Public demo used for unrestricted fault injection | Roles gate injection; targets are only the owned sample service; kill switch; leases ≤ 1 h |
 | Image architecture mismatch (arm64 Mac vs amd64 Azure) | Build in CI for `linux/amd64` only |
 | Migration failure mid-release | Migration job runs before the revision switch; rollback is the previous tag + forward-only fix |
+| A platform default changes under the template (seen in Step 4: new environments defaulted to Express) | State important modes explicitly in Bicep (`environmentMode`); a preview before every provision; read the live resource after creating it |
+| The student credit runs out and the subscription is disabled | $10 budget with alerts, PostgreSQL stopped between demos, a 0.05 GB/day log cap, and teardown once the credit drops below $15 |
 
 ## 7. Definition of done
 

@@ -1,8 +1,9 @@
 # Phase 3 Sprints, in Figures
 
-One figure per sprint of [PHASE_3_PLAN.md](PHASE_3_PLAN.md). **Status (2026-11-20):** Sprints 0–3 are
-done (#23–#30; see the plan's Step 3 progress table). Sprint 4 waits for written authorization. Sprints 2 and 3 need no Azure account. Sprints 4 to 6 need
-written authorization first.
+One figure per sprint of [PHASE_3_PLAN.md](PHASE_3_PLAN.md). **Status (2026-11-22):** Sprints 0–4 are
+done. Sprints 0–3 are #23–#30 (see the plan's Step 3 progress table). Sprint 4 provisioned the hosted
+demo after the written authorization on 2026-11-21 (see the plan's Step 4 progress table, and #38–#40
+for the fixes it needed). Sprints 5 and 6 remain.
 
 The figures are built by `node docs/figures/src/phase-3-sprints.mjs`. Edit the script, not the SVGs.
 
@@ -60,7 +61,7 @@ storage, PostgreSQL, the environment, both apps, the migration job and the budge
 in the required `infra-validate` job. The
 sprint opens with a `Program.cs` refactor (ticket 3.0) that the figure doesn't show.
 
-## Sprint 4 — Provision (requires authorization)
+## Sprint 4 — Provision (done)
 
 ![Sprint 4: provisioning and the one-time setup, after authorization](figures/phase-3/fig-p3-s4.svg)
 
