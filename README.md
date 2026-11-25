@@ -234,10 +234,23 @@ set -a; eval "$(azd env get-values)"; set +a
 scripts/deploy-demo.sh sha-<commit>
 ```
 
-**Until ticket 5.3 lands, `azd provision` sets the images from `STRIA_IMAGE_TAG`**, so after a CI deploy it would put the apps back on the older tag. Before provisioning, set it to the tag that is running:
+**Provisioning never changes the images.** Bicep declares each image as `…:${STRIA_IMAGE_TAG}`, so a stale value would roll the apps back after a CI deploy. An azd `preprovision` hook (`scripts/preprovision.sh`, declared in `azure.yaml`) runs before every `azd provision` and `azd up`, reads the images that `stria-server`, `sample-payment-gateway` and `stria-migrate` run, and sets `STRIA_IMAGE_TAG` to their shared `sha-` tag. It only reads Azure, and it stops the provision when it can't be sure:
+
+| The hook sees | It does |
+|---|---|
+| The images share one `sha-` tag | Sets `STRIA_IMAGE_TAG` to it (prints the old and new value) and continues |
+| No app or job yet (first provisions) | Keeps `STRIA_IMAGE_TAG` as set in the runbook and continues |
+| Images on different tags, or not `<registry>/<repo>:sha-<commit>` | Fails: deploy one tag with `deploy.yml` (below), then provision |
+| PostgreSQL not `Ready` | Fails with the start command |
+| Any other `az` error (signed out, wrong subscription, network) | Fails and prints the error |
+
+To change the images, deploy. Don't provision while a deploy is running (`gh run list`): the hook would read the old tag and the provision would write it back.
+
+**Run the hook yourself before a preview.** `azd provision --preview` doesn't run it, so the what-if would compare against a stale `STRIA_IMAGE_TAG` and show the images changing:
 
 ```sh
-azd env set STRIA_IMAGE_TAG "$(az containerapp show -g rg-stria-demo -n stria-server --query 'properties.template.containers[0].image' -o tsv | sed 's/.*://')"
+azd hooks run preprovision
+azd provision --preview
 ```
 
 ### Roll back
