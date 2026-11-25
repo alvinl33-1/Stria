@@ -6,3 +6,9 @@ infra:
   provider: bicep
   path: infra
   module: main
+# The deploy path owns the images: before every provision, the hook sets STRIA_IMAGE_TAG to the
+# tag the demo runs, so provisioning repeats it (ticket 5.3). azd runs shell: sh hooks with bash.
+hooks:
+  preprovision:
+    shell: sh
+    run: scripts/preprovision.sh

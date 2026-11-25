@@ -237,8 +237,8 @@ test fails, roll back to the previous tag automatically.
 |---|---|---|
 | 5.0 Deploy identity + OIDC trust | Merged #42, provisioned 2026-11-23 | `id-stria-deploy-demo` with federated credential `github-demo`; 6 roles, each on one resource (AcrPush on the registry, Container Apps Contributor on both apps, Jobs Contributor on `stria-migrate`, Managed Identity Operator on `id-stria-demo`, Reader on PostgreSQL). GitHub environment `demo`: reviewer Alvin, protected branches only, 6 variables |
 | 5.1 `scripts/hosted-smoke.sh` | Merged #43 | 11 checks pass live; planted defects fail (exit 2 misuse, exit 1 failure) |
-| 5.2 Deploy job | Merged #46; fix 5.2a in review | `scripts/deploy-demo.sh` (16 scenarios against stubbed `az`/`docker`, bash 5 and 3.2, shellcheck clean), `deploy` job in `ci.yml`, manual `deploy.yml`; proven by the first run after merge |
-| 5.3 Live image tag for `azd provision` | Planned | An azd `preprovision` hook reads the tag running on `stria-server` and sets `STRIA_IMAGE_TAG`, so provisioning never rolls the apps back |
+| 5.2 Deploy job | Done: merged #46, fix #47; deployed 2026-11-23 | Run 45253367067 deployed `sha-b790e3b` end to end after approval: OIDC login, push, migration job, both apps on new ready revisions, 11 smoke checks green (3 min after approval). The first run (#46) exercised the rollback for real |
+| 5.3 Live image tag for `azd provision` | In progress | `scripts/preprovision.sh`, declared in `azure.yaml`, reads all three images, requires one `sha-` tag and sets `STRIA_IMAGE_TAG`; fails on PostgreSQL not Ready or any `az` error other than not-found. 13 stub scenarios on bash 3.2 and 5.3, a planted defect caught; live `azd hooks run preprovision` reset a planted `sha-stale` to `sha-b790e3b` |
 | 5.4 Separate migrator and app identities | Planned | `id-stria-migrate` owns the tables; `id-stria-demo` keeps DML only (`GRANT SELECT, INSERT, UPDATE, DELETE` plus `ALTER DEFAULT PRIVILEGES`) |
 
 **OIDC subject.** This repository uses GitHub's immutable subjects (`use_immutable_subject:
@@ -280,6 +280,22 @@ of scalars one value per line, so the image came back empty. The rollback worked
 the job back on `sha-ae9be7e6`, smoke test green afterwards), but its wait had the same bug, so it
 reported exit 3. The stubbed `az` used in testing printed one row, the same wrong assumption.
 Fixed in 5.2a by wrapping the query in a second list, which tsv prints as one row.
+
+**Second run (2026-11-23, run 45253367067, `b790e3b`):** deployed end to end. Migration 44 s,
+`stria-server` ready revision 39 s after its update, `sample-payment-gateway` 38 s, smoke test
+2 s; 3 minutes from approval to `Deployed`.
+
+**5.3 findings (2026-11-25, azd 1.39.1):**
+- `shell: sh` hooks run as `bash <file>` from PATH (not `/bin/sh`), so the hook stays bash and
+  must work on bash 3.2.
+- azd exports the environment's values to the hook; a nested `azd env set` writes to the
+  environment being provisioned (`AZURE_ENV_NAME` is passed down).
+- **`azd provision --preview` doesn't run preprovision hooks.** With `sha-stale` planted, the
+  preview printed no hook output and the value was still `sha-stale` afterwards. The README says to
+  run `azd hooks run preprovision` before a preview.
+- azd's preview summary can't show an image change: it prints `* properties.template.containers`
+  without values, and that line appears even when the tag is right (probe-order noise). Use
+  `az deployment group what-if` for the detail.
 
 ### Step 6 — Verify, document, hand off
 
