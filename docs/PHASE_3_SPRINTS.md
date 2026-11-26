@@ -1,10 +1,11 @@
 # Phase 3 Sprints, in Figures
 
-One figure per sprint of [PHASE_3_PLAN.md](PHASE_3_PLAN.md). **Status (2026-11-23):** Sprints 0–4 are
+One figure per sprint of [PHASE_3_PLAN.md](PHASE_3_PLAN.md). **Status (2026-11-25):** Sprints 0–4 are
 done. Sprints 0–3 are #23–#30 (see the plan's Step 3 progress table). Sprint 4 provisioned the hosted
 demo after the written authorization on 2026-11-21 (see the plan's Step 4 progress table, and #38–#40
-for the fixes it needed). Sprint 5 is in progress: 5.0–5.2 are done (#42–#47), and since 2026-11-23 every push to `main`
-deploys through CI after approval; 5.3 and 5.4 remain (see the plan's Step 5 progress table).
+for the fixes it needed). Sprint 5 is in progress: 5.0–5.3 are done (#42–#49). Since 2026-11-23 every push to `main`
+deploys through CI after approval, and since 5.3 `azd provision` keeps the running image tag; 5.4a (sample identity) and 5.4b (migrator identity + database split) remain
+(see the plan's Step 5 progress table).
 Sprint 6 remains.
 
 The figures are built by `node docs/figures/src/phase-3-sprints.mjs`. Edit the script, not the SVGs.

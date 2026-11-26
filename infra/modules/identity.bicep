@@ -1,6 +1,7 @@
-// A user-assigned identity. main.bicep creates two: one for the apps and the migration job, and
-// one the GitHub deploy job signs in as (Sprint 5). Each exists before anything uses it, so its role
-// assignments are already in place on the first pull and the first token.
+// A user-assigned identity. main.bicep creates three: one for stria-server and the migration job,
+// one for the sample service (5.4a), and one the GitHub deploy job signs in as (Sprint 5). Each
+// exists before anything uses it, so its role assignments are already in place on the first pull
+// and the first token.
 param name string
 param location string
 param tags object

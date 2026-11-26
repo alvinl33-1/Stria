@@ -55,6 +55,17 @@ module identity 'modules/identity.bicep' = {
   }
 }
 
+// 5.4a: the sample service gets its own identity, so it no longer holds the table owner's database
+// role or the vault-wide secret access that stria-server needs.
+module sampleIdentity 'modules/identity.bicep' = {
+  name: 'sample-identity'
+  params: {
+    name: 'id-stria-sample-${environmentName}'
+    location: location
+    tags: tags
+  }
+}
+
 module monitoring 'modules/monitoring.bicep' = {
   name: 'monitoring'
   params: {
@@ -71,7 +82,10 @@ module registry 'modules/registry.bicep' = {
     name: 'crstria${suffix}'
     location: location
     tags: tags
-    pullPrincipalId: identity.outputs.principalId
+    pullPrincipalIds: [
+      identity.outputs.principalId
+      sampleIdentity.outputs.principalId
+    ]
   }
 }
 
@@ -83,6 +97,7 @@ module keyVault 'modules/keyvault.bicep' = {
     tags: tags
     appPrincipalId: identity.outputs.principalId
     operatorPrincipalId: operatorPrincipalId
+    samplePrincipalId: deployApps ? sampleIdentity.outputs.principalId : ''
   }
 }
 
@@ -147,7 +162,7 @@ module sample 'modules/sample.bicep' = if (deployApps) {
     location: location
     tags: tags
     environmentId: environment.outputs.id
-    identityId: identity.outputs.id
+    identityId: sampleIdentity.outputs.id
     registryServer: registry.outputs.loginServer
     image: '${registry.outputs.loginServer}/stria-sample:${imageTag}'
     keyVaultUri: keyVault.outputs.uri
@@ -189,6 +204,7 @@ module deployIdentity 'modules/identity.bicep' = if (deployApps) {
     tags: tags
   }
 }
+
 module deployAccess 'modules/deploy-access.bicep' = if (deployApps) {
   name: 'deploy-access'
   params: {
@@ -200,6 +216,7 @@ module deployAccess 'modules/deploy-access.bicep' = if (deployApps) {
     sampleAppName: sample!.outputs.name
     migrateJobName: migrate!.outputs.name
     appIdentityName: identity.outputs.name
+    sampleIdentityName: sampleIdentity.outputs.name
     postgresServerName: postgres.outputs.name
   }
 }

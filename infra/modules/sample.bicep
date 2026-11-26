@@ -3,7 +3,10 @@ param name string
 param location string
 param tags object
 param environmentId string
+
+@description('The sample\'s own identity (5.4a): AcrPull and the one secret below, no database role.')
 param identityId string
+
 param registryServer string
 param image string
 param keyVaultUri string

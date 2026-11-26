@@ -10,6 +10,9 @@ param appPrincipalId string
 @description('Operator who stores secrets during one-time setup. Empty skips the assignment.')
 param operatorPrincipalId string = ''
 
+@description('The sample service identity, which reads one secret. Empty skips the assignment: on the first provision the secret does not exist yet.')
+param samplePrincipalId string = ''
+
 var secretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6'
 var secretsOfficerRoleId = 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7'
 var cryptoServiceEncryptionUserRoleId = 'e147488a-f6f5-4113-8e2d-b22465e65bf6'
@@ -69,6 +72,23 @@ resource appKeyWrapper 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
       cryptoServiceEncryptionUserRoleId
     )
     principalId: appPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// The secret is created by hand during setup (README step 4), never by Bicep: `existing` only names
+// it as the scope. Scoped to that one secret, so the sample can't read the Entra client secret.
+resource paymentGatewayKey 'Microsoft.KeyVault/vaults/secrets@2023-07-01' existing = {
+  parent: vault
+  name: 'paymentgateway-key'
+}
+
+resource sampleSecretUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(samplePrincipalId)) {
+  name: guid(paymentGatewayKey.id, samplePrincipalId, secretsUserRoleId)
+  scope: paymentGatewayKey
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', secretsUserRoleId)
+    principalId: samplePrincipalId
     principalType: 'ServicePrincipal'
   }
 }
