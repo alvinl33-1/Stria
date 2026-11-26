@@ -87,7 +87,10 @@ curl -i http://localhost:8080/readyz
 The hosted demo is one resource group, `rg-stria-demo`, described entirely by `infra/`. It contains:
 - PostgreSQL Flexible Server (B1ms, Entra sign-in only).
 - A Container Apps environment with `stria-server` (public HTTPS), `sample-payment-gateway` (internal only) and the `stria-migrate` job.
-- Azure Container Registry, Key Vault, a storage account for the Data Protection keys, Log Analytics with Application Insights, one user-assigned managed identity, and a monthly budget.
+- Azure Container Registry, Key Vault, a storage account for the Data Protection keys, Log Analytics with Application Insights, a monthly budget, and three user-assigned managed identities, each holding only the roles its workload uses:
+  - `id-stria-<env>`: `stria-server` and the migration job.
+  - `id-stria-sample-<env>`: the sample service. It can pull images and read the one secret `paymentgateway-key`, and has no database role.
+  - `id-stria-deploy-<env>`: the GitHub deploy job (OIDC, no secret).
 
 No password or key is stored in the repository or in the Bicep parameters.
 

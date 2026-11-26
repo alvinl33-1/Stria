@@ -238,8 +238,9 @@ test fails, roll back to the previous tag automatically.
 | 5.0 Deploy identity + OIDC trust | Merged #42, provisioned 2026-11-23 | `id-stria-deploy-demo` with federated credential `github-demo`; 6 roles, each on one resource (AcrPush on the registry, Container Apps Contributor on both apps, Jobs Contributor on `stria-migrate`, Managed Identity Operator on `id-stria-demo`, Reader on PostgreSQL). GitHub environment `demo`: reviewer Alvin, protected branches only, 6 variables |
 | 5.1 `scripts/hosted-smoke.sh` | Merged #43 | 11 checks pass live; planted defects fail (exit 2 misuse, exit 1 failure) |
 | 5.2 Deploy job | Done: merged #46, fix #47; deployed 2026-11-23 | Run 45253367067 deployed `sha-b790e3b` end to end after approval: OIDC login, push, migration job, both apps on new ready revisions, 11 smoke checks green (3 min after approval). The first run (#46) exercised the rollback for real |
-| 5.3 Live image tag for `azd provision` | In progress | `scripts/preprovision.sh`, declared in `azure.yaml`, reads all three images, requires one `sha-` tag and sets `STRIA_IMAGE_TAG`; fails on PostgreSQL not Ready or any `az` error other than not-found. 13 stub scenarios on bash 3.2 and 5.3, a planted defect caught; live `azd hooks run preprovision` reset a planted `sha-stale` to `sha-b790e3b` |
-| 5.4 Separate migrator and app identities | Planned | `id-stria-migrate` owns the tables; `id-stria-demo` keeps DML only (`GRANT SELECT, INSERT, UPDATE, DELETE` plus `ALTER DEFAULT PRIVILEGES`) |
+| 5.3 Live image tag for `azd provision` | Done: merged #49 2026-11-25 (CI deployed `sha-e95acb8`) | `scripts/preprovision.sh`, declared in `azure.yaml`, reads all three images, requires one `sha-` tag and sets `STRIA_IMAGE_TAG`; fails on PostgreSQL not Ready or any `az` error other than not-found. 13 stub scenarios on bash 3.2 and 5.3, a planted defect caught; live `azd hooks run preprovision` reset a planted `sha-stale` to `sha-b790e3b`. Not yet observed: a real `azd provision` resolving parameters after the hook's write (azd docs and #4611 say it does) |
+| 5.4a Sample service identity | Planned (design below) | `id-stria-sample` with AcrPull and Key Vault Secrets User on the one secret `paymentgateway-key`; no PostgreSQL role. Bicep only |
+| 5.4b Migrator identity + database split | Planned (design below) | `id-stria-migrate` owns the tables (option A); `id-stria-demo` keeps the server's DML only, `KillSwitchEvents` becomes insert-only for it. Bicep + a converge SQL script tested by Testcontainers |
 
 **OIDC subject.** This repository uses GitHub's immutable subjects (`use_immutable_subject:
 true`), so the federated credential trusts
@@ -296,6 +297,85 @@ Fixed in 5.2a by wrapping the query in a second list, which tsv prints as one ro
 - azd's preview summary can't show an image change: it prints `* properties.template.containers`
   without values, and that line appears even when the tag is right (probe-order noise). Use
   `az deployment group what-if` for the detail.
+
+**5.4 design (decided 2026-11-25: split into 5.4a and 5.4b, option A; lecture 14).**
+
+*Names.* Like `id-stria-${environmentName}` and `id-stria-deploy-${environmentName}`, the new
+identities end in the environment name: `id-stria-sample-demo` and `id-stria-migrate-demo` in the
+demo. The short names below leave the suffix out; the PostgreSQL role and SQL use the full name.
+
+*Why.* `id-stria-demo` is attached to all three workloads. Any code running with an identity can
+use every permission it holds, and PostgreSQL's `0.0.0.0` rule admits every Azure IP, so today the
+**sample service** could connect as the table owner and read `entra-client-secret` (vault-scope
+Secrets User). After 5.4 each workload holds only what its code uses:
+
+| Identity | Used by | Azure roles | PostgreSQL |
+|---|---|---|---|
+| `id-stria-demo` | `stria-server` | unchanged: AcrPull, Secrets User (vault), key wrap (one key), Blob Data Contributor (`dpkeys`) | `SELECT, INSERT, UPDATE, DELETE` on `ChaosExperiments`; `SELECT, INSERT` on `KillSwitchEvents`; no DDL, no `__EFMigrationsHistory` |
+| `id-stria-migrate` (5.4b) | `stria-migrate` | AcrPull | owner of every table; `USAGE, CREATE` on `public` |
+| `id-stria-sample` (5.4a) | `sample-payment-gateway` | AcrPull; Secrets User on the secret `paymentgateway-key` only | none |
+| `id-stria-deploy-demo` | GitHub deploy job | + Managed Identity Operator on each new identity (`job/app update` re-sends the identity) | Reader on the server (unchanged) |
+
+*5.4a (Bicep only).*
+- A third `identity.bicep` instance, `id-stria-sample`.
+- The registry module takes a list of pull principals. `guid(registry.id, principalId, role)`
+  keeps the existing assignment's name, so ARM changes nothing for it.
+- A secret-scoped Secrets User assignment in `keyvault.bicep` (`existing` secret
+  `paymentgateway-key` as scope), only when the sample principal is passed. The secret doesn't
+  exist on the first provision (README step 4 creates it), so it's empty until `STRIA_DEPLOY_APPS`.
+- `sample.bicep` runs as the new identity, for the registry and the secret reference.
+- `deploy-access.bicep` gains Managed Identity Operator on it.
+- One provision. If Azure hasn't propagated the new role before the sample's new revision
+  fetches its secret, the update fails, the old revision keeps serving, and a second
+  `azd provision` succeeds. That's an accepted, safe failure for an internal workload with no data.
+- Verify: the sample's new revision is ready and polling (the dashboard shows the service); the
+  deploy job still updates it (Managed Identity Operator); `az role assignment list` shows the
+  sample identity on exactly two scopes.
+
+*5.4b (Bicep + SQL).*
+- Bicep: `id-stria-migrate` with AcrPull; the job runs as it, with its own connection string
+  (`Username=id-stria-migrate`) and `AZURE_CLIENT_ID`; `deploy-access.bicep` gains Managed
+  Identity Operator on it. The server's settings don't change.
+- SQL: a reviewed **converge script** in the repo, run by the Entra admin in one transaction.
+  Converge means it produces the same end state from any start, like Bicep. It gives the
+  migrator `USAGE, CREATE` on `public` and the server `USAGE`, then runs
+  `REASSIGN OWNED BY "id-stria-demo" TO "id-stria-migrate"`. It sets default privileges for tables
+  the migrator creates later, grants the server's table rights explicitly, revokes
+  `UPDATE, DELETE, TRUNCATE` on `KillSwitchEvents` and all rights on `__EFMigrationsHistory`, and
+  revokes `CREATE` on `public` from the server.
+  - Verified 2026-11-25 on PostgreSQL 16.16 (a superuser stood in for the Azure admin). It gives
+    the same end state for the existing environment (app owns the tables) and a fresh one (the
+    migrator created them), and a second run changes nothing.
+  - Role names stay out of EF migrations, because Compose and tests have no `id-stria-*` roles.
+- Test: MSTest + Testcontainers creates both roles with passwords, applies the real migrations as
+  `id-stria-demo`, runs the **same file**, and asserts the permission matrix with real logins
+  (`42501` on the denied rows). Planted defects that must fail it: `UPDATE` granted on
+  `KillSwitchEvents`, the `REVOKE CREATE` removed, the default-privileges line removed.
+- Live order:
+  1. PostgreSQL `Ready`; `azd provision` (the identity exists and the job switches; the job pulls
+     only when it runs).
+  2. Temporary firewall rule; `pgaadauth_create_principal('id-stria-migrate', false, false)`; list
+     what `id-stria-demo` owns; check `\dn+ public`; run the script; check
+     `has_table_privilege`/`has_schema_privilege`; delete the rule.
+  3. Redeploy the running tag with `deploy.yml`: the migration runs as `id-stria-migrate` and the
+     smoke test passes.
+  4. In the dashboard: engage and release the kill switch, clear an experiment.
+  - **Approve no deploy between 1 and 2.** A migration would fail (no PostgreSQL role yet), safely:
+    the script rolls the job back and never touches the apps.
+- Fresh environments (README runbook): before the first migration, grant the migrator
+  `USAGE, CREATE` and the server `USAGE` on `public`. After it, run the converge script. The
+  server has no table rights until then.
+- Rollback: `REASSIGN OWNED BY "id-stria-migrate" TO "id-stria-demo"` + `GRANT CREATE ON SCHEMA
+  public TO "id-stria-demo"`; revert the Bicep change and provision.
+- To prove live (⚠): that the Azure admin (`azure_pg_admin`, not a superuser) may run the
+  `REASSIGN`; Learn documents the extended `azure_pg_admin` rights. Also whether `PUBLIC` holds
+  `CREATE` on `public` (Learn says new Azure databases may grant it); if it does, the script
+  must also run `REVOKE CREATE ON SCHEMA public FROM PUBLIC`, because a role-level revoke doesn't
+  remove a privilege granted through `PUBLIC` (shown locally).
+
+*Not fixed by 5.4:* the `0.0.0.0` firewall rule (private networking is a production item), the
+server's vault-wide Secrets User (narrowing it is the same move as 5.4a), and deploy access =
+workload access (a job-start override would now run as the table owner).
 
 ### Step 6 — Verify, document, hand off
 

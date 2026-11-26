@@ -16,6 +16,7 @@ param serverAppName string
 param sampleAppName string
 param migrateJobName string
 param appIdentityName string
+param sampleIdentityName string
 param postgresServerName string
 
 var acrPushRoleId = '8311e382-0749-4cb8-b61a-304f252e45ec'
@@ -59,6 +60,10 @@ resource job 'Microsoft.App/jobs@2024-03-01' existing = {
 
 resource appIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
   name: appIdentityName
+}
+
+resource sampleIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
+  name: sampleIdentityName
 }
 
 resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' existing = {
@@ -111,6 +116,16 @@ resource jobContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 resource appIdentityOperator 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(appIdentity.id, principalId, managedIdentityOperatorRoleId)
   scope: appIdentity
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', managedIdentityOperatorRoleId)
+    principalId: principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource sampleIdentityOperator 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(sampleIdentity.id, principalId, managedIdentityOperatorRoleId)
+  scope: sampleIdentity
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', managedIdentityOperatorRoleId)
     principalId: principalId
